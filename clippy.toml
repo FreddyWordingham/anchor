@@ -1,0 +1,17 @@
+# Only lint top‐level module items (not enums, structs, impls, etc., inside)
+source-item-ordering = ["module"]
+
+# Define the exact grouping you want, in the order you want:
+module-item-order-groupings = [
+  ["modules",     ["extern_crate", "mod", "foreign_mod"]],
+  ["use",         ["use"]],
+  ["macros",      ["macro"]],
+  ["global_asm",  ["global_asm"]],
+  ["constants",   ["static", "const"]],
+  ["types",       ["ty_alias", "enum", "struct", "union", "trait", "trait_alias"]],
+  ["impls",       ["impl"]],
+  ["functions",   ["fn"]],
+]
+
+# Don’t require alphabetical order within any of those groups
+module-items-ordered-within-groupings = "none"
