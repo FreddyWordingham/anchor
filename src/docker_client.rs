@@ -128,7 +128,7 @@ impl DockerClient {
     }
 
     /// Create a Docker container from an image.
-    pub async fn create_container<S: AsRef<str>>(&self, image_name: S, container_port: u16, host_port: u16) -> Result<String> {
+    pub async fn create_container<S: AsRef<str>>(&self, image_name: S, port_mappings: &[(u16, u16)]) -> Result<String> {
         // Check if image exists first
         if !self.is_image_downloaded(image_name.as_ref()).await? {
             return Err(DockerError::ImageError(format!("Image {} not found", image_name.as_ref())));
@@ -136,16 +136,21 @@ impl DockerClient {
 
         // Configure port bindings
         let mut exposed_ports = HashMap::new();
-        exposed_ports.insert(container_port.to_string(), HashMap::new());
-
         let mut port_bindings = HashMap::new();
-        port_bindings.insert(
-            container_port.to_string(),
-            Some(vec![PortBinding {
-                host_port: Some(host_port.to_string()),
-                ..Default::default()
-            }]),
-        );
+
+        for (container_port, host_port) in port_mappings {
+            // Add to exposed ports (Docker requires the "/tcp" suffix)
+            exposed_ports.insert(format!("{}/tcp", container_port), HashMap::new());
+
+            // Add to port bindings
+            port_bindings.insert(
+                format!("{}/tcp", container_port),
+                Some(vec![PortBinding {
+                    host_port: Some(host_port.to_string()),
+                    ..Default::default()
+                }]),
+            );
+        }
 
         let config = ContainerCreateBody {
             image: Some(image_name.as_ref().to_string()),
