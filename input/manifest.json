@@ -1,0 +1,14 @@
+{
+  "containers": {
+    "add-node": {
+      "uri": "939027885851.dkr.ecr.eu-west-2.amazonaws.com/uncertainty-engine-add-node:latest",
+      "port_mappings": [[8000, 8001]],
+      "command": "Run"
+    },
+    "display-node": {
+      "uri": "939027885851.dkr.ecr.eu-west-2.amazonaws.com/uncertainty-engine-display-node:latest",
+      "port_mappings": [[8000, 8002]],
+      "command": "Run"
+    }
+  }
+}

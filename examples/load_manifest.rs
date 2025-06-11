@@ -1,6 +1,6 @@
 use anchor::prelude::{Manifest, ManifestError};
 
-const MANIFEST_FILEPATH: &str = "./assets/manifest.json";
+const MANIFEST_FILEPATH: &str = "./input/manifest.json";
 
 #[tokio::main]
 async fn main() -> Result<(), ManifestError> {

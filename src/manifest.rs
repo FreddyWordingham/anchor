@@ -33,12 +33,12 @@ impl Manifest {
     pub fn validate(&self) -> Result<(), ManifestError> {
         // Check for that all ports are unique
         let mut seen_ports = HashSet::new();
-        for (id, container) in &self.containers {
+        for (name, container) in &self.containers {
             for (_port, host_port) in &container.port_mappings {
                 if !seen_ports.insert(*host_port) {
                     return Err(ManifestError::ValidationError(format!(
                         "Host port {} for container '{}' is used multiple times",
-                        host_port, id
+                        host_port, name
                     )));
                 }
             }
@@ -52,16 +52,16 @@ impl Manifest {
     }
 
     /// Add a `Container` to the `Manifest`.
-    /// Returns an error if a container with the same ID already exists.
+    /// Returns an error if a container with the same name already exists.
     /// Returns an error if the container's port mappings are not unique across the manifest.
-    pub fn add_container(&mut self, id: String, container: Container) -> Result<(), ManifestError> {
-        if self.containers.contains_key(&id) {
+    pub fn add_container(&mut self, name: String, container: Container) -> Result<(), ManifestError> {
+        if self.containers.contains_key(&name) {
             return Err(ManifestError::ValidationError(format!(
-                "Container with ID '{}' already exists",
-                id
+                "Container with name '{}' already exists",
+                name
             )));
         }
-        self.containers.insert(id, container);
+        self.containers.insert(name, container);
         self.validate()?;
         Ok(())
     }

@@ -14,3 +14,8 @@ tokio = { version = "1.45.1", features = [
     "io-std",
 ] }
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+aws-config = "1.6.3"
+aws-sdk-ecr = "1.78.0"
+base64 = "0.22.1"

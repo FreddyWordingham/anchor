@@ -62,17 +62,19 @@ impl DockerClient {
     }
 
     /// Check if a specific image is already pulled.
-    pub async fn is_image_downloaded<S: AsRef<str>>(&self, image_name: S) -> Result<bool> {
-        let filters = HashMap::from([("reference", vec![image_name.as_ref()])]);
+    /// Accepts full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest" or "nginx:latest")
+    pub async fn is_image_downloaded<S: AsRef<str>>(&self, image_reference: S) -> Result<bool> {
+        let filters = HashMap::from([("reference", vec![image_reference.as_ref()])]);
         let options = ListImagesOptionsBuilder::default().all(true).filters(&filters).build();
         let images = self.docker.list_images(Some(options)).await?;
         Ok(!images.is_empty())
     }
 
     /// Pull (download) a Docker image.
-    pub async fn download_image<S: AsRef<str>>(&self, image_name: S) -> Result<()> {
+    /// Accepts full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest" or "nginx:latest")
+    pub async fn pull_image<S: AsRef<str>>(&self, image_reference: S) -> Result<()> {
         let options = CreateImageOptionsBuilder::default()
-            .from_image(image_name.as_ref())
+            .from_image(image_reference.as_ref())
             .platform(&self.platform)
             .build();
 
@@ -94,24 +96,28 @@ impl DockerClient {
                 }
                 Err(err) => {
                     println!(); // ensure we drop to a new line if an error occurs
-                    return Err(DockerError::ImageError(err.to_string()));
+                    return Err(DockerError::image_error(
+                        image_reference,
+                        format!("Failed to pull image: {}", err),
+                    ));
                 }
             }
         }
 
-        // After the stream finishes, move to a new line so the prompt isn’t stuck at the end of the last overwrite
+        // After the stream finishes, move to a new line so the prompt isn't stuck at the end of the last overwrite
         println!();
 
         Ok(())
     }
 
     /// Remove (delete) a Docker image.
-    pub async fn remove_image<S: AsRef<str>>(&self, image_name: S) -> Result<()> {
+    /// Accepts image reference or image ID
+    pub async fn remove_image<S: AsRef<str>>(&self, image_reference: S) -> Result<()> {
         let options = RemoveImageOptionsBuilder::default().force(true).build();
         self.docker
-            .remove_image(image_name.as_ref(), Some(options), Some(self.credentials.clone()))
+            .remove_image(image_reference.as_ref(), Some(options), Some(self.credentials.clone()))
             .await
-            .map_err(|err| DockerError::ImageError(err.to_string()))?;
+            .map_err(|err| DockerError::image_error(image_reference, format!("Failed to remove image: {}", err)))?;
         Ok(())
     }
 
@@ -128,10 +134,20 @@ impl DockerClient {
     }
 
     /// Create a Docker container from an image.
-    pub async fn create_container<S: AsRef<str>>(&self, image_name: S, port_mappings: &[(u16, u16)]) -> Result<String> {
+    /// image_reference: Full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest")
+    /// container_name: Name to assign to the container
+    pub async fn build_container<S: AsRef<str>, T: AsRef<str>>(
+        &self,
+        image_reference: S,
+        container_name: T,
+        port_mappings: &[(u16, u16)],
+    ) -> Result<String> {
         // Check if image exists first
-        if !self.is_image_downloaded(image_name.as_ref()).await? {
-            return Err(DockerError::ImageError(format!("Image {} not found", image_name.as_ref())));
+        if !self.is_image_downloaded(image_reference.as_ref()).await? {
+            return Err(DockerError::container_error(
+                container_name,
+                format!("Cannot build container: image '{}' not found", image_reference.as_ref()),
+            ));
         }
 
         // Configure port bindings
@@ -153,7 +169,7 @@ impl DockerClient {
         }
 
         let config = ContainerCreateBody {
-            image: Some(image_name.as_ref().to_string()),
+            image: Some(image_reference.as_ref().to_string()),
             exposed_ports: Some(exposed_ports),
             host_config: Some(bollard::models::HostConfig {
                 port_bindings: Some(port_bindings),
@@ -162,26 +178,19 @@ impl DockerClient {
             ..Default::default()
         };
 
-        fn extract_name(s: &str) -> Option<&str> {
-            // look for the prefix
-            let prefix = "uncertainty-engine-";
-            let start = s.find(prefix)?;
-            // take the substring from the prefix onward
-            let rest = &s[start..];
-            // stop at the colon
-            let end = rest.find(':')?;
-            Some(&rest[..end])
-        }
-
-        let name = extract_name(image_name.as_ref()).unwrap();
-        let options = CreateContainerOptionsBuilder::default().name(name).build();
+        let options = CreateContainerOptionsBuilder::default().name(container_name.as_ref()).build();
 
         // Create the container
-        let container_info = self
-            .docker
-            .create_container(Some(options), config)
-            .await
-            .map_err(|err| DockerError::ContainerError(format!("Failed to create container: {}", err)))?;
+        let container_info = self.docker.create_container(Some(options), config).await.map_err(|err| {
+            DockerError::container_error(
+                container_name,
+                format!(
+                    "Failed to create container from image '{}': {}",
+                    image_reference.as_ref(),
+                    err
+                ),
+            )
+        })?;
 
         Ok(container_info.id)
     }
@@ -192,7 +201,7 @@ impl DockerClient {
         for container in self.list_containers().await? {
             if let Some(names) = &container.names {
                 for name in names {
-                    if name.contains(container_name.as_ref()) {
+                    if name == &format!("/{}", container_name.as_ref()) {
                         built = true;
                         break;
                     }
@@ -208,7 +217,7 @@ impl DockerClient {
         for container in self.list_running_containers().await? {
             if let Some(names) = &container.names {
                 for name in names {
-                    if name.contains(container_name.as_ref()) {
+                    if name == &format!("/{}", container_name.as_ref()) {
                         running = true;
                         break;
                     }
@@ -218,37 +227,42 @@ impl DockerClient {
         Ok(running)
     }
 
-    /// Start a Docker container.
-    pub async fn start_container<S: AsRef<str>>(&self, container_name: S) -> Result<()> {
-        // Start the container
+    /// Start a Docker container by name or ID.
+    pub async fn start_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = StartContainerOptionsBuilder::default().build();
         self.docker
-            .start_container(container_name.as_ref(), Some(options))
+            .start_container(container_name_or_id.as_ref(), Some(options))
             .await
-            .map_err(|err| DockerError::ContainerError(format!("Failed to start container: {}", err)))?;
+            .map_err(|err| {
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to start container: {}", err))
+            })?;
 
         Ok(())
     }
 
-    /// Stop a Docker container.
-    pub async fn stop_container<S: AsRef<str>>(&self, container_name: S) -> Result<()> {
+    /// Stop a Docker container by name or ID.
+    pub async fn stop_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = StopContainerOptionsBuilder::default()
             .t(10) // 10 seconds timeout
             .build();
         self.docker
-            .stop_container(container_name.as_ref(), Some(options))
+            .stop_container(container_name_or_id.as_ref(), Some(options))
             .await
-            .map_err(|err| DockerError::ContainerError(format!("Failed to stop container: {}", err)))?;
+            .map_err(|err| {
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to stop container: {}", err))
+            })?;
         Ok(())
     }
 
-    /// Remove (delete) a Docker container.
-    pub async fn remove_container<S: AsRef<str>>(&self, container_name: S) -> Result<()> {
+    /// Remove (delete) a Docker container by name or ID.
+    pub async fn remove_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = RemoveContainerOptionsBuilder::default().force(true).build();
         self.docker
-            .remove_container(container_name.as_ref(), Some(options))
+            .remove_container(container_name_or_id.as_ref(), Some(options))
             .await
-            .map_err(|err| DockerError::ContainerError(format!("Failed to remove container: {}", err)))?;
+            .map_err(|err| {
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to remove container: {}", err))
+            })?;
         Ok(())
     }
 }
