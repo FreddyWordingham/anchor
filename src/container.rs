@@ -10,7 +10,7 @@ use crate::command::Command;
 pub struct Container {
     /// Docker image URI (e.g., "nginx:latest" or "my-registry.com/app:v1.0")
     pub uri: String,
-    /// Port mappings as (container_port, host_port) pairs
+    /// Port mappings as (`container_port`, `host_port`) pairs
     pub port_mappings: Vec<(u16, u16)>,
     /// Target command determining how far to progress this container
     pub command: Command,

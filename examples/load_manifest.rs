@@ -1,4 +1,4 @@
-use anchor::prelude::{Manifest, ManifestError};
+use anchor::prelude::{Manifest, ManifestError, get_ecr_credentials};
 
 const MANIFEST_FILEPATH: &str = "./input/manifest.json";
 

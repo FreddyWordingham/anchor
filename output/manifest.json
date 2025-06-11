@@ -1,13 +1,23 @@
 {
   "containers": {
-    "web": {
-      "uri": "docker.io/library/nginx:latest",
-      "port_mappings": [[80, 8080]],
-      "command": "Run"
-    },
     "db": {
       "uri": "docker.io/library/postgres:latest",
-      "port_mappings": [[5432, 5432]],
+      "port_mappings": [
+        [
+          5432,
+          5432
+        ]
+      ],
+      "command": "Run"
+    },
+    "web": {
+      "uri": "docker.io/library/nginx:latest",
+      "port_mappings": [
+        [
+          80,
+          8080
+        ]
+      ],
       "command": "Run"
     }
   }

@@ -18,10 +18,10 @@ A Rust library for managing Docker container clusters through declarative JSON m
 
 - **Declarative Configuration**: Define your container cluster using JSON manifests
 - **State Management**: Track container states (Waiting, Downloaded, Built, Running)
-- **ECR Integration**: Support for AWS ECR credentials
 - **Port Management**: Automatic port mapping with uniqueness validation
 - **Progress Tracking**: Real-time feedback during cluster operations
 - **Error Handling**: Comprehensive error types for debugging
+- **ECR Integration**: Optional support for AWS ECR credentials integration
 
 ## Quick Start
 
@@ -31,6 +31,8 @@ A Rust library for managing Docker container clusters through declarative JSON m
 [dependencies]
 anchor = "0.0.0"
 ```
+
+> Add support for ECR with `anchor = { version = "0.0.0", features = ["ecr"] }`
 
 ### 2. Write a Manifest
 

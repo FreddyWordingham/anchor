@@ -2,7 +2,7 @@
 ///
 /// Containers progress through these states sequentially:
 /// - `Waiting` → `Downloaded` → `Built` → `Running`
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ContainerState {
     /// Container is waiting to be processed (initial state)
     Waiting,

@@ -44,7 +44,7 @@ impl Manifest {
     /// # Errors
     /// Returns `ManifestError::ValidationError` if port conflicts are detected.
     pub fn new(containers: HashMap<String, Container>) -> Result<Self, ManifestError> {
-        let manifest = Manifest { containers };
+        let manifest = Self { containers };
         manifest.validate()?;
         Ok(manifest)
     }
@@ -52,8 +52,9 @@ impl Manifest {
     /// Creates an empty manifest with no containers.
     ///
     /// Useful as a starting point for programmatically building manifests.
+    #[must_use]
     pub fn empty() -> Self {
-        Manifest {
+        Self {
             containers: HashMap::new(),
         }
     }
@@ -71,8 +72,7 @@ impl Manifest {
             for (_port, host_port) in &container.port_mappings {
                 if !seen_ports.insert(*host_port) {
                     return Err(ManifestError::ValidationError(format!(
-                        "Host port {} for container '{}' is used multiple times",
-                        host_port, name
+                        "Host port {host_port} for container '{name}' is used multiple times"
                     )));
                 }
             }
@@ -83,7 +83,8 @@ impl Manifest {
     /// Returns a reference to the containers map.
     ///
     /// Provides read-only access to all container configurations in the manifest.
-    pub fn containers(&self) -> &HashMap<String, Container> {
+    #[must_use]
+    pub const fn containers(&self) -> &HashMap<String, Container> {
         &self.containers
     }
 
@@ -101,11 +102,10 @@ impl Manifest {
     pub fn add_container(&mut self, name: String, container: Container) -> Result<(), ManifestError> {
         if self.containers.contains_key(&name) {
             return Err(ManifestError::ValidationError(format!(
-                "Container with name '{}' already exists",
-                name
+                "Container with name '{name}' already exists"
             )));
         }
-        self.containers.insert(name, container);
+        let _unused = self.containers.insert(name, container);
         self.validate()?;
         Ok(())
     }
@@ -161,7 +161,7 @@ impl Manifest {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, ManifestError> {
         let mut file = File::open(path)?;
         let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
+        let _num_bytes = file.read_to_string(&mut contents)?;
         Self::from_json(&contents)
     }
 }

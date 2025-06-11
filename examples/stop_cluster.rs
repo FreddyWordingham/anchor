@@ -1,8 +1,5 @@
-use anchor::prelude::{Cluster, DockerClient, Manifest};
+use anchor::prelude::{Cluster, DockerClient, Manifest, get_ecr_credentials};
 use std::error::Error;
-
-mod auth;
-use auth::get_ecr_credentials;
 
 const MANIFEST_FILEPATH: &str = "./input/manifest.json";
 

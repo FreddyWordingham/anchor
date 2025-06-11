@@ -16,6 +16,7 @@ use crate::{
 ///
 /// Handles the complete lifecycle of downloading images, building containers,
 /// and coordinating startup/shutdown across multiple containers defined in a manifest.
+#[derive(Debug)]
 pub struct Cluster<'a> {
     /// The Docker client used to interact with the Docker daemon.
     client: &'a DockerClient,
@@ -39,9 +40,9 @@ impl<'a> Cluster<'a> {
 
         for (name, container) in &manifest.containers {
             match container.command {
-                Command::Ignore => continue,
+                Command::Ignore => {}
                 _ => {
-                    containers.insert(name.clone(), ContainerState::Waiting);
+                    _ = containers.insert(name.clone(), ContainerState::Waiting);
                 }
             }
         }
@@ -74,21 +75,21 @@ impl<'a> Cluster<'a> {
                 .client
                 .is_container_running(name)
                 .await
-                .map_err(|err| DockerError::container_error(name, format!("Failed to sync container state: {}", err)))?
+                .map_err(|err| DockerError::container_error(name, format!("Failed to sync container state: {err}")))?
             {
                 *state = ContainerState::Running;
             } else if self
                 .client
                 .is_container_built(name)
                 .await
-                .map_err(|err| DockerError::container_error(name, format!("Failed to sync container state: {}", err)))?
+                .map_err(|err| DockerError::container_error(name, format!("Failed to sync container state: {err}")))?
             {
                 *state = ContainerState::Built;
             } else if self
                 .client
                 .is_image_downloaded(name)
                 .await
-                .map_err(|err| DockerError::image_error(name, format!("Failed to sync image state: {}", err)))?
+                .map_err(|err| DockerError::image_error(name, format!("Failed to sync image state: {err}")))?
             {
                 *state = ContainerState::Downloaded;
             } else {
@@ -141,13 +142,13 @@ impl<'a> Cluster<'a> {
         for (name, state) in &mut self.containers {
             if *state == ContainerState::Waiting {
                 if !self.client.is_image_downloaded(name).await.map_err(|err| {
-                    DockerError::image_error(name, format!("Failed to check image status during next(): {}", err))
+                    DockerError::image_error(name, format!("Failed to check image status during next(): {err}"))
                 })? {
                     let uri = &self.manifest.containers[name].uri;
                     self.client
                         .pull_image(uri)
                         .await
-                        .map_err(|err| DockerError::image_error(name, format!("Failed to pull image '{}': {}", uri, err)))?;
+                        .map_err(|err| DockerError::image_error(name, format!("Failed to pull image '{uri}': {err}")))?;
                 }
                 *state = ContainerState::Downloaded;
                 return Ok(ClusterStatus::Downloaded(name.clone()));
@@ -162,46 +163,39 @@ impl<'a> Cluster<'a> {
                         if !self.client.is_container_built(name).await.map_err(|err| {
                             DockerError::container_error(
                                 name,
-                                format!("Failed to check container build status during next(): {}", err),
+                                format!("Failed to check container build status during next(): {err}"),
                             )
                         })? {
                             let uri = &self.manifest.containers[name].uri;
                             let port_mappings = &self.manifest.containers[name].port_mappings;
-                            self.client.build_container(uri, name, port_mappings).await.map_err(|err| {
+                            let _id = self.client.build_container(uri, name, port_mappings).await.map_err(|err| {
                                 DockerError::container_error(
                                     name,
-                                    format!("Failed to build container from image '{}': {}", uri, err),
+                                    format!("Failed to build container from image '{uri}': {err}"),
                                 )
                             })?;
                         }
                         *state = ContainerState::Built;
                         return Ok(ClusterStatus::Built(name.clone()));
                     }
-                    _ => continue,
+                    _ => {}
                 }
             }
         }
 
         // Check if any container needs to be run
         for (name, state) in &mut self.containers {
-            if *state == ContainerState::Built {
-                match self.manifest.containers[name].command {
-                    Command::Run => {
-                        if !self.client.is_container_running(name).await.map_err(|err| {
-                            DockerError::container_error(
-                                name,
-                                format!("Failed to check container running status during next(): {}", err),
-                            )
-                        })? {
-                            self.client.start_container(name).await.map_err(|err| {
-                                DockerError::container_error(name, format!("Failed to start container: {}", err))
-                            })?;
-                        }
-                        *state = ContainerState::Running;
-                        return Ok(ClusterStatus::Running(name.clone()));
-                    }
-                    _ => continue,
+            if *state == ContainerState::Built && matches!(self.manifest.containers[name].command, Command::Run) {
+                if !self.client.is_container_running(name).await.map_err(|err| {
+                    DockerError::container_error(name, format!("Failed to check container running status during next(): {err}"))
+                })? {
+                    self.client
+                        .start_container(name)
+                        .await
+                        .map_err(|err| DockerError::container_error(name, format!("Failed to start container: {err}")))?;
                 }
+                *state = ContainerState::Running;
+                return Ok(ClusterStatus::Running(name.clone()));
             }
         }
 
@@ -222,7 +216,7 @@ impl<'a> Cluster<'a> {
         for (name, state) in &mut self.containers {
             if *state == ContainerState::Running {
                 self.client.stop_container(name).await.map_err(|err| {
-                    DockerError::container_error(name, format!("Failed to stop container during server shutdown: {}", err))
+                    DockerError::container_error(name, format!("Failed to stop container during server shutdown: {err}"))
                 })?;
                 *state = ContainerState::Built;
             }
@@ -236,7 +230,7 @@ impl Display for Cluster<'_> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(fmt, "Cluster State:")?;
         for (name, state) in &self.containers {
-            writeln!(fmt, "{}: {:?}", name, state)?;
+            writeln!(fmt, "{name}: {state:?}")?;
         }
         Ok(())
     }

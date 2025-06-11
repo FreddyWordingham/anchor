@@ -1,8 +1,5 @@
-use anchor::prelude::DockerClient;
+use anchor::prelude::{DockerClient, get_ecr_credentials};
 use std::error::Error;
-
-mod auth;
-use auth::get_ecr_credentials;
 
 const IMAGE_REFERENCE: &str = "939027885851.dkr.ecr.eu-west-2.amazonaws.com/uncertainty-engine-add-node:latest";
 const CONTAINER_NAME: &str = "add-node";

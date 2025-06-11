@@ -1,8 +1,5 @@
-use anchor::prelude::DockerClient;
+use anchor::prelude::{DockerClient, get_ecr_credentials};
 use std::error::Error;
-
-mod auth;
-use auth::get_ecr_credentials;
 
 const CONTAINER_NAME: &str = "add-node";
 

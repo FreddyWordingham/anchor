@@ -1,7 +1,7 @@
 /// Represents the status of cluster operations, indicating which step was just completed.
 ///
 /// Used as feedback during cluster startup to track progress across all containers.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ClusterStatus {
     /// Image download completed for the specified container
     Downloaded(String),

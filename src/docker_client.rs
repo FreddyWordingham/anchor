@@ -26,6 +26,7 @@ pub type Result<T> = std::result::Result<T, DockerError>;
 /// Provides high-level operations for managing Docker images and containers,
 /// including authenticated pulls from registries like AWS ECR. Maintains
 /// connection state and platform information for the Docker environment.
+#[derive(Debug)]
 pub struct DockerClient {
     /// Handle to the Docker daemon connection
     docker: Docker,
@@ -53,9 +54,9 @@ impl DockerClient {
         let info = docker.info().await?;
         let os = info.os_type.as_deref().unwrap_or("?");
         let arch = info.architecture.as_deref().unwrap_or("?");
-        let platform = format!("{}/{}", os, arch);
+        let platform = format!("{os}/{arch}");
 
-        Ok(DockerClient {
+        Ok(Self {
             docker,
             credentials,
             platform,
@@ -65,6 +66,7 @@ impl DockerClient {
     /// Returns the platform string (OS/architecture) of the Docker daemon.
     ///
     /// Format: "linux/amd64", "darwin/arm64", etc.
+    #[must_use]
     pub fn platform(&self) -> &str {
         &self.platform
     }
@@ -101,7 +103,7 @@ impl DockerClient {
         let target_ref = image_reference.as_ref();
 
         // Extract short tag for comparison
-        let short_tag = target_ref.split('/').last().unwrap_or(target_ref);
+        let short_tag = target_ref.split('/').next_back().unwrap_or(target_ref);
 
         for image in self.list_images().await? {
             for tag in &image.repo_tags {
@@ -141,17 +143,17 @@ impl DockerClient {
                     let layer = id.unwrap_or_default();
                     let status_text = status.unwrap_or_default();
                     let progress_text = progress.unwrap_or_default();
-                    let line = format!("[{}] {} {}", layer, status_text, progress_text);
+                    let line = format!("[{layer}] {status_text} {progress_text}");
 
                     // "\r" moves cursor back to start; "\x1B[K" clears from cursor to end of line
-                    print!("\r\x1B[K{}", line);
-                    stdout().flush().unwrap();
+                    print!("\r\x1B[K{line}");
+                    stdout().flush()?;
                 }
                 Err(err) => {
                     println!(); // ensure we drop to a new line if an error occurs
                     return Err(DockerError::image_error(
                         image_reference,
-                        format!("Failed to pull image: {}", err),
+                        format!("Failed to pull image: {err}"),
                     ));
                 }
             }
@@ -174,10 +176,11 @@ impl DockerClient {
     /// Returns `DockerError::ImageError` if removal fails.
     pub async fn remove_image<S: AsRef<str>>(&self, image_reference: S) -> Result<()> {
         let options = RemoveImageOptionsBuilder::default().force(true).build();
-        self.docker
+        let _unused = self
+            .docker
             .remove_image(image_reference.as_ref(), Some(options), Some(self.credentials.clone()))
             .await
-            .map_err(|err| DockerError::image_error(image_reference, format!("Failed to remove image: {}", err)))?;
+            .map_err(|err| DockerError::image_error(image_reference, format!("Failed to remove image: {err}")))?;
         Ok(())
     }
 
@@ -208,7 +211,7 @@ impl DockerClient {
     /// # Arguments
     /// * `image_reference` - Docker image to create container from
     /// * `container_name` - Name to assign to the new container
-    /// * `port_mappings` - Array of (container_port, host_port) tuples
+    /// * `port_mappings` - Array of (`container_port`, `host_port`) tuples
     ///
     /// # Returns
     /// The container ID of the created container.
@@ -235,11 +238,15 @@ impl DockerClient {
 
         for (container_port, host_port) in port_mappings {
             // Add to exposed ports (Docker requires the "/tcp" suffix)
-            exposed_ports.insert(format!("{}/tcp", container_port), HashMap::new());
+            #[expect(
+                clippy::zero_sized_map_values,
+                reason = "The seemingly odd choice of a `HashMap::new` type for the map value is a upstream requirement for a `bollard::models::PortBinding`."
+            )]
+            let _unused = exposed_ports.insert(format!("{container_port}/tcp"), HashMap::new());
 
             // Add to port bindings
-            port_bindings.insert(
-                format!("{}/tcp", container_port),
+            let _unused = port_bindings.insert(
+                format!("{container_port}/tcp"),
                 Some(vec![PortBinding {
                     host_port: Some(host_port.to_string()),
                     ..Default::default()
@@ -333,7 +340,7 @@ impl DockerClient {
             .start_container(container_name_or_id.as_ref(), Some(options))
             .await
             .map_err(|err| {
-                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to start container: {}", err))
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to start container: {err}"))
             })?;
 
         Ok(())
@@ -356,7 +363,7 @@ impl DockerClient {
             .stop_container(container_name_or_id.as_ref(), Some(options))
             .await
             .map_err(|err| {
-                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to stop container: {}", err))
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to stop container: {err}"))
             })?;
         Ok(())
     }
@@ -376,7 +383,7 @@ impl DockerClient {
             .remove_container(container_name_or_id.as_ref(), Some(options))
             .await
             .map_err(|err| {
-                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to remove container: {}", err))
+                DockerError::container_error(container_name_or_id.as_ref(), format!("Failed to remove container: {err}"))
             })?;
         Ok(())
     }

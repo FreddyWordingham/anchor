@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter, Result};
 /// Defines the target action to perform on a container during cluster operations.
 ///
 /// Commands determine how far through the container lifecycle each container should progress.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Command {
     /// Skip this container entirely during cluster operations
     Ignore,
@@ -19,10 +19,10 @@ pub enum Command {
 impl Display for Command {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
         match self {
-            Command::Ignore => write!(fmt, "Ignore"),
-            Command::Download => write!(fmt, "Download"),
-            Command::Build => write!(fmt, "Build"),
-            Command::Run => write!(fmt, "Run"),
+            Self::Ignore => write!(fmt, "Ignore"),
+            Self::Download => write!(fmt, "Download"),
+            Self::Build => write!(fmt, "Build"),
+            Self::Run => write!(fmt, "Run"),
         }
     }
 }
