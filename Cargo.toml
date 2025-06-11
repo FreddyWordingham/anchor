@@ -2,6 +2,15 @@
 name = "anchor"
 version = "0.0.0"
 edition = "2024"
+authors = ["Freddy Wordingham <freddy@digilab.ai>"]
+description = "A Rust library for managing Docker container clusters through declarative JSON manifests"
+homepage = "https://github.com/FreddyWordingham/anchor"
+repository = "https://github.com/FreddyWordingham/anchor"
+documentation = "https://docs.rs/anchor"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["docker", "containers", "cluster", "orchestration", "devops"]
+categories = ["development-tools", "api-bindings", "virtualization"]
 
 [dependencies]
 bollard = "0.19.0"
