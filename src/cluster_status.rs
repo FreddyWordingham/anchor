@@ -1,5 +1,5 @@
 #[derive(Debug, PartialEq)]
-pub enum ServerStatus {
+pub enum ClusterStatus {
     Downloaded(String),
     Built(String),
     Running(String),

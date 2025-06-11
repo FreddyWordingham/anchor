@@ -4,26 +4,19 @@ use std::{
 };
 
 use crate::{
-    command::Command, docker_client::DockerClient, docker_error::DockerError, manifest::Manifest, server_status::ServerStatus,
+    cluster_status::ClusterStatus, command::Command, container_state::ContainerState, docker_client::DockerClient,
+    docker_error::DockerError, manifest::Manifest,
 };
 
 type Result<T> = std::result::Result<T, DockerError>;
 
-#[derive(Debug, PartialEq)]
-enum ContainerState {
-    Waiting,
-    Downloaded,
-    Built,
-    Running,
-}
-
-pub struct Server<'a> {
+pub struct Cluster<'a> {
     client: &'a DockerClient,
     manifest: Manifest,
     containers: HashMap<String, ContainerState>,
 }
 
-impl<'a> Server<'a> {
+impl<'a> Cluster<'a> {
     pub async fn new(client: &'a DockerClient, manifest: Manifest) -> Result<Self> {
         let mut containers = HashMap::new();
 
@@ -36,16 +29,16 @@ impl<'a> Server<'a> {
             }
         }
 
-        let mut server = Self {
+        let mut cluster = Self {
             client,
             manifest,
             containers,
         };
-        server.sync().await?;
-        Ok(server)
+        cluster.sync().await?;
+        Ok(cluster)
     }
 
-    /// Syncronize the server state with the Docker daemon.
+    /// Syncronize the `Cluster` state with the Docker daemon.
     pub async fn sync(&mut self) -> Result<()> {
         // Check if Docker is running
         if !self.client.is_docker_running().await {
@@ -86,11 +79,11 @@ impl<'a> Server<'a> {
     /// Start all containers with a callback for each status update
     pub async fn start<F>(&mut self, mut callback: F) -> Result<()>
     where
-        F: FnMut(&ServerStatus),
+        F: FnMut(&ClusterStatus),
     {
         loop {
             match self.next().await? {
-                ServerStatus::Ready => break,
+                ClusterStatus::Ready => break,
                 status => {
                     callback(&status);
                 }
@@ -102,7 +95,7 @@ impl<'a> Server<'a> {
 
     /// Perform the next step in starting the cluster containers.
     /// Return the status of the step which was just performed.
-    async fn next(&mut self) -> Result<ServerStatus> {
+    async fn next(&mut self) -> Result<ClusterStatus> {
         // Check if any image needs to be downloaded
         for (name, state) in &mut self.containers {
             if *state == ContainerState::Waiting {
@@ -116,7 +109,7 @@ impl<'a> Server<'a> {
                         .map_err(|err| DockerError::image_error(name, format!("Failed to pull image '{}': {}", uri, err)))?;
                 }
                 *state = ContainerState::Downloaded;
-                return Ok(ServerStatus::Downloaded(name.clone()));
+                return Ok(ClusterStatus::Downloaded(name.clone()));
             }
         }
 
@@ -141,7 +134,7 @@ impl<'a> Server<'a> {
                             })?;
                         }
                         *state = ContainerState::Built;
-                        return Ok(ServerStatus::Built(name.clone()));
+                        return Ok(ClusterStatus::Built(name.clone()));
                     }
                     _ => continue,
                 }
@@ -164,19 +157,19 @@ impl<'a> Server<'a> {
                             })?;
                         }
                         *state = ContainerState::Running;
-                        return Ok(ServerStatus::Running(name.clone()));
+                        return Ok(ClusterStatus::Running(name.clone()));
                     }
                     _ => continue,
                 }
             }
         }
 
-        Ok(ServerStatus::Ready)
+        Ok(ClusterStatus::Ready)
     }
 
     /// Stop all running containers and reduce their state to `ContainerState::Built`.
     pub async fn stop(&mut self) -> Result<()> {
-        // Ensure the server is in sync before stopping containers
+        // Ensure the cluster containers are in sync before stopping containers
         self.sync().await?;
 
         for (name, state) in &mut self.containers {
@@ -192,9 +185,9 @@ impl<'a> Server<'a> {
     }
 }
 
-impl Display for Server<'_> {
+impl Display for Cluster<'_> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(fmt, "Server State:")?;
+        writeln!(fmt, "Cluster State:")?;
         for (name, state) in &self.containers {
             writeln!(fmt, "{}: {:?}", name, state)?;
         }

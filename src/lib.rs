@@ -1,15 +1,16 @@
+mod cluster;
+mod cluster_status;
 mod command;
 mod container;
+mod container_state;
 mod docker_client;
 mod docker_error;
 mod manifest;
 mod manifest_error;
-mod server;
-mod server_status;
 
 pub mod prelude {
     pub use crate::{
-        command::Command, container::Container, docker_client::DockerClient, docker_error::DockerError, manifest::Manifest,
-        manifest_error::ManifestError, server::Server, server_status::ServerStatus,
+        cluster::Cluster, cluster_status::ClusterStatus, command::Command, container::Container, docker_client::DockerClient,
+        docker_error::DockerError, manifest::Manifest, manifest_error::ManifestError,
     };
 }

@@ -1,4 +1,4 @@
-use anchor::prelude::{DockerClient, Manifest, Server};
+use anchor::prelude::{Cluster, DockerClient, Manifest};
 use std::error::Error;
 
 mod auth;
@@ -12,8 +12,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let credentials = get_ecr_credentials().await?;
     let client = DockerClient::new(credentials).await?;
 
-    let mut server = Server::new(&client, manifest).await?;
-    server.start(|status| println!("{:?}", status)).await?;
+    let mut cluster = Cluster::new(&client, manifest).await?;
+    cluster.start(|status| println!("{:?}", status)).await?;
     println!("All containers are ready.");
 
     Ok(())

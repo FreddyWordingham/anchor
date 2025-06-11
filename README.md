@@ -1,234 +1,286 @@
-# Anchor
+<p align="center" style="font-size: 2.5em">
+    Anchor
+</p>
+<p align="center">
+    <img src="./assets/images/icon.png" alt="Anchor Icon" width="200" style="border-radius: 5%; border: 2px solid #000;">
+</p>
+<p align="center" style="font-size: 1.5em">
+    Declarative Docker Cluster Management in Rust
+</p>
 
-An improved Rust library for Docker operations with comprehensive async support and observability.
+[![crates.io](https://img.shields.io/crates/v/anchor.svg)](https://crates.io/crates/anchor)
+[![Documentation](https://docs.rs/anchor/badge.svg)](https://docs.rs/anchor)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🚀 Key Features
+A Rust library for managing Docker container clusters through declarative JSON manifests. Anchor simplifies the process of downloading images, building containers, and orchestrating multi-container applications.
 
-### Enhanced Async Support
+## Features
 
-- **Configurable timeouts** for all Docker operations
-- **Retry logic** with exponential backoff for connection issues
-- **Concurrent task management** for running multiple operations simultaneously
-- **Graceful cancellation** of long-running operations
+- **Declarative Configuration**: Define your container cluster using JSON manifests
+- **State Management**: Track container states (Waiting, Downloaded, Built, Running)
+- **ECR Integration**: Support for AWS ECR credentials
+- **Port Management**: Automatic port mapping with uniqueness validation
+- **Progress Tracking**: Real-time feedback during cluster operations
+- **Error Handling**: Comprehensive error types for debugging
 
-### Comprehensive Observability
+## Quick Start
 
-- **Real-time progress reporting** via broadcast channels
-- **Structured progress events** covering all operation types
-- **Task lifecycle tracking** with detailed metadata
-- **Statistics and metrics** for monitoring performance
+### 1. Add to Cargo.toml
 
-### Production-Ready Features
+```toml
+[dependencies]
+anchor = "0.0.0"
+```
 
-- **Timeout protection** for all Docker API calls
-- **Memory-efficient progress parsing**
-- **Automatic cleanup** of completed tasks
-- **Comprehensive error handling** with context
+### 2. Write a Manifest
 
-## 📦 Usage Examples
+```json
+{
+  "containers": {
+    "web": {
+      "uri": "docker.io/library/nginx:latest",
+      "port_mappings": [[80, 8080]],
+      "command": "Run"
+    },
+    "db": {
+      "uri": "docker.io/library/postgres:latest",
+      "port_mappings": [[5432, 5432]],
+      "command": "Run"
+    }
+  }
+}
+```
 
-### Basic Usage with Progress Reporting
+### 3. Start Your Cluster
 
 ```rust
-use std::time::Duration;
-use bollard::auth::DockerCredentials;
+use anchor::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // Load manifest
+    let manifest = Manifest::load("manifest.json")?;
+
+    // Setup Docker client with credentials
+    let credentials = get_docker_credentials().await?;
+    let client = DockerClient::new(credentials).await?;
+
+    // Create and start cluster
+    let mut cluster = Cluster::new(&client, manifest).await?;
+    cluster.start(|status| {
+        println!("Status: {:?}", status);
+    }).await?;
+
+    println!("✅ All containers are ready!");
+    Ok(())
+}
+```
+
+## Core Components
+
+### Manifest
+
+The `Manifest` struct defines your container cluster configuration:
+
+```json
+{
+  "containers": {
+    "web": {
+      "uri": "nginx:latest",
+      "command": "Run",
+      "port_mappings": [[80, 8080]]
+    },
+    "db": {
+      "uri": "postgres:latest",
+      "command": "Run",
+      "port_mappings": [[5432, 5432]]
+    }
+  }
+}
+```
+
+You can also specify a manfest programmatically in Rust:
+
+```rust
+let mut manifest = Manifest::empty();
+
+// Add a web server
+manifest.add_container(
+    "web".to_string(),
+    Container {
+        uri: "nginx:latest".to_string(),
+        command: Command::Run,
+        port_mappings: vec![(80, 8080)],
+    },
+)?;
+
+// Add a database
+manifest.add_container(
+    "db".to_string(),
+    Container {
+        uri: "postgres:latest".to_string(),
+        command: Command::Run,
+        port_mappings: vec![(5432, 5432)],
+    },
+)?;
+
+// Save to file
+manifest.save("manifest.json")?;
+```
+
+### Container Commands
+
+- **`Ignore`**: Skip this container entirely
+- **`Download`**: Only download the image
+- **`Build`**: Download image and create container
+- **`Run`**: Download, build, and start the container
+
+### Container States
+
+Anchor tracks each container through these states:
+
+- **`Waiting`**: Initial state, nothing done yet
+- **`Downloaded`**: Docker image has been pulled
+- **`Built`**: Container has been created from image
+- **`Running`**: Container is actively running
+
+### Cluster Operations
+
+```rust
+// Create cluster
+let mut cluster = Cluster::new(&client, manifest).await?;
+
+// Start all containers with progress callback
+cluster.start(|status| match status {
+    ClusterStatus::Downloaded(name) => println!("📥 Downloaded: {}", name),
+    ClusterStatus::Built(name) => println!("🔨 Built: {}", name),
+    ClusterStatus::Running(name) => println!("🚀 Running: {}", name),
+    ClusterStatus::Ready => println!("✅ All ready!"),
+}).await?;
+
+// Stop all containers
+cluster.stop().await?;
+
+// Check current state
+println!("{}", cluster); // Displays all container states
+```
+
+## Error Handling
+
+Anchor provides detailed error types:
+
+```rust
+use anchor::prelude::*;
+
+match result {
+    Err(DockerError::ConnectionError(msg)) => {
+        eprintln!("Docker connection failed: {}", msg);
+    },
+    Err(DockerError::ImageError { image, message }) => {
+        eprintln!("Image '{}' error: {}", image, message);
+    },
+    Err(DockerError::ContainerError { container, message }) => {
+        eprintln!("Container '{}' error: {}", container, message);
+    },
+    Ok(_) => println!("Success!"),
+}
+```
+
+## Examples
+
+### Basic Web Application
+
+```rust
 use anchor::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), DockerError> {
-    // Create progress reporter
-    let (progress_reporter, mut progress_receiver) = ProgressReporter::new();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut manifest = Manifest::empty();
 
-    // Monitor progress in background
-    tokio::spawn(async move {
-        while let Ok(event) = progress_receiver.recv().await {
-            match event {
-                ProgressEvent::ImageDownload { image_name, status, progress, .. } => {
-                    if let Some(prog) = progress {
-                        println!("📦 {}: {} - {:.1}%", image_name, status, prog.percentage);
-                    } else {
-                        println!("📦 {}: {}", image_name, status);
-                    }
-                }
-                ProgressEvent::Operation { message, level, .. } => {
-                    println!("{:?}: {}", level, message);
-                }
-                _ => {}
-            }
-        }
-    });
-
-    // Create Docker client with custom configuration
-    let config = DockerConfig {
-        operation_timeout: Duration::from_secs(300),
-        connection_timeout: Duration::from_secs(10),
-        retry_attempts: 3,
-        retry_delay: Duration::from_secs(2),
-    };
-
-    let client = DockerClient::with_config(DockerCredentials::default(), config)
-        .await?
-        .with_progress_reporter(progress_reporter);
-
-    // Download image with progress tracking
-    client.download_image("nginx:alpine").await?;
-
-    Ok(())
-}
-```
-
-### Concurrent Task Management
-
-```rust
-use anchor::prelude::*;
-
-async fn concurrent_operations() -> Result<(), DockerError> {
-    let (progress_reporter, _) = ProgressReporter::new();
-
-    let client = DockerClient::new(DockerCredentials::default())
-        .await?
-        .with_progress_reporter(progress_reporter.clone());
-
-    let task_manager = TaskManager::new(client)
-        .with_progress_reporter(progress_reporter)
-        .with_max_concurrent_tasks(5);
-
-    // Submit multiple download tasks
-    let images = vec!["nginx:alpine", "redis:alpine", "postgres:alpine"];
-    let mut handles = Vec::new();
-
-    for image in &images {
-        let task = TaskType::ImageDownload {
-            image_name: image.to_string(),
-        };
-        let handle = task_manager.submit_task(task).await?;
-        handles.push(handle);
-    }
-
-    // Wait for all downloads
-    for handle in handles {
-        handle.wait().await?;
-    }
-
-    // Show statistics
-    let stats = task_manager.get_task_statistics().await;
-    println!("Completed: {}/{}", stats.completed, stats.total);
-
-    Ok(())
-}
-```
-
-### Manifest-Based Operations
-
-```rust
-use std::collections::HashMap;
-use anchor::prelude::*;
-
-async fn manifest_operations() -> Result<(), DockerError> {
-    // Create manifest
-    let mut containers = HashMap::new();
-    containers.insert("web".to_string(), Container {
-        uri: "nginx:latest".to_string(),
-        port_mappings: vec![(80, 8080)],
+    // Frontend
+    manifest.add_container("frontend".to_string(), Container {
+        uri: "nginx:alpine".to_string(),
         command: Command::Run,
-    });
+        port_mappings: vec![(80, 3000)],
+    })?;
 
-    let manifest = Manifest::new(containers)?;
-    manifest.save("docker-manifest.json")?;
+    // Backend API
+    manifest.add_container("api".to_string(), Container {
+        uri: "node:18-alpine".to_string(),
+        command: Command::Run,
+        port_mappings: vec![(8000, 8000)],
+    })?;
 
-    // Process manifest with task manager
-    let task_manager = TaskManager::new(
-        DockerClient::new(DockerCredentials::default()).await?
-    );
+    // Database
+    manifest.add_container("database".to_string(), Container {
+        uri: "postgres:15".to_string(),
+        command: Command::Run,
+        port_mappings: vec![(5432, 5432)],
+    })?;
 
+    // Save and start
+    manifest.save("web-app.json")?;
+
+    let credentials = get_docker_credentials().await?;
+    let client = DockerClient::new(credentials).await?;
+    let mut cluster = Cluster::new(&client, manifest).await?;
+
+    cluster.start(|status| {
+        println!("🔄 {:?}", status);
+    }).await?;
+
+    println!("🌐 Web application running!");
+    println!("Frontend: http://localhost:3000");
+    println!("API: http://localhost:8000");
+
+    Ok(())
+}
+```
+
+### Loading from Configuration File
+
+```rust
+use anchor::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load from JSON file
+    let manifest = Manifest::load("./config/production.json")?;
+
+    println!("Loaded {} containers", manifest.containers().len());
+
+    // Display configuration
     for (name, container) in manifest.containers() {
-        if matches!(container.command, Command::Run | Command::Download) {
-            let task = TaskType::ImageDownload {
-                image_name: container.uri.clone(),
-            };
-            task_manager.submit_task(task).await?;
-        }
+        println!("📦 {}: {}", name, container.uri);
+        println!("   Command: {}", container.command);
+        println!("   Ports: {:?}", container.port_mappings);
     }
 
     Ok(())
 }
 ```
 
-## 🔧 Configuration
+## Requirements
 
-### DockerConfig Options
+- Docker installed and running
+- Rust 2024 or later
+- Network access for image downloads
+- Appropriate permissions for Docker operations
 
-```rust
-let config = DockerConfig {
-    operation_timeout: Duration::from_secs(600),  // 10 minutes
-    connection_timeout: Duration::from_secs(30),  // 30 seconds
-    retry_attempts: 3,                            // 3 retries
-    retry_delay: Duration::from_secs(1),          // 1 second between retries
-};
-```
+## Platform Support
 
-### Task Manager Options
+- ✅ Linux
+- ✅ macOS
+- ✅ Windows (with Docker Desktop)
 
-```rust
-let task_manager = TaskManager::new(client)
-    .with_progress_reporter(reporter)
-    .with_max_concurrent_tasks(10);  // Max 10 concurrent operations
-```
+## Contributing
 
-## 📊 Progress Events
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-The library emits structured progress events:
+## License
 
-- **ImageDownload**: Real-time download progress with layer information
-- **ContainerCreate**: Container creation status updates
-- **ContainerLifecycle**: Start/stop/remove operations
-- **Operation**: General operation messages with log levels
-
-## 🛠 Task Management
-
-### Task Types
-
-- `ImageDownload`: Download Docker images
-- `ContainerCreate`: Create containers from images
-- `ContainerStart/Stop/Remove`: Container lifecycle operations
-- `ImageRemove`: Remove Docker images
-
-### Task Status Tracking
-
-- **Pending**: Task queued but not started
-- **Running**: Task currently executing
-- **Completed**: Task finished successfully
-- **Failed**: Task encountered an error
-- **Cancelled**: Task was cancelled
-
-### Statistics
-
-```rust
-let stats = task_manager.get_task_statistics().await;
-println!("Total: {}, Completed: {}, Failed: {}",
-         stats.total, stats.completed, stats.failed);
-if let Some(avg) = stats.average_duration {
-    println!("Average duration: {:?}", avg);
-}
-```
-
-## 🎯 Benefits
-
-1. **Better UX**: Real-time progress feedback for long operations
-2. **Scalability**: Handle multiple concurrent Docker operations efficiently
-3. **Reliability**: Timeout protection and retry logic prevent hanging
-4. **Observability**: Detailed tracking of operations and performance
-5. **Flexibility**: Configurable behavior for different use cases
-6. **Production-Ready**: Comprehensive error handling and resource management
-
-## 🔍 Error Handling
-
-The library provides structured error types:
-
-- `ConnectionError`: Docker daemon connection issues
-- `ImageError`: Image-related operations (download, remove)
-- `ContainerError`: Container lifecycle operations
-- `ECRCredentialsError`: Authentication issues
-- `NotInstalled`: Docker not available
-
-All operations include timeout protection and retry logic for transient failures.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
