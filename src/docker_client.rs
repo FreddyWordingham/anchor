@@ -64,10 +64,21 @@ impl DockerClient {
     /// Check if a specific image is already pulled.
     /// Accepts full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest" or "nginx:latest")
     pub async fn is_image_downloaded<S: AsRef<str>>(&self, image_reference: S) -> Result<bool> {
-        let filters = HashMap::from([("reference", vec![image_reference.as_ref()])]);
-        let options = ListImagesOptionsBuilder::default().all(true).filters(&filters).build();
-        let images = self.docker.list_images(Some(options)).await?;
-        Ok(!images.is_empty())
+        let target_ref = image_reference.as_ref();
+
+        // Extract short tag for comparison
+        let short_tag = target_ref.split('/').last().unwrap_or(target_ref);
+
+        for image in self.list_images().await? {
+            for tag in &image.repo_tags {
+                // Check both full URI and short tag
+                if tag == target_ref || tag == short_tag {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
     }
 
     /// Pull (download) a Docker image.
