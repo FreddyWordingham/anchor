@@ -1,4 +1,4 @@
-use anchor::prelude::{DockerClient, Manifest, Server, ServerStatus};
+use anchor::prelude::{DockerClient, Manifest, Server};
 use std::error::Error;
 
 mod auth;
@@ -13,13 +13,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = DockerClient::new(credentials).await?;
 
     let mut server = Server::new(&client, manifest).await?;
-    loop {
-        let status = server.next().await?;
-        if status == ServerStatus::Ready {
-            break;
-        }
-        println!("{:?}", status);
-    }
+    server.start(|status| println!("{:?}", status)).await?;
     println!("All containers are ready.");
 
     Ok(())

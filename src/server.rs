@@ -83,7 +83,26 @@ impl<'a> Server<'a> {
         Ok(())
     }
 
-    pub async fn next(&mut self) -> Result<ServerStatus> {
+    /// Start all containers with a callback for each status update
+    pub async fn start<F>(&mut self, mut callback: F) -> Result<()>
+    where
+        F: FnMut(&ServerStatus),
+    {
+        loop {
+            match self.next().await? {
+                ServerStatus::Ready => break,
+                status => {
+                    callback(&status);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Perform the next step in starting the cluster containers.
+    /// Return the status of the step which was just performed.
+    async fn next(&mut self) -> Result<ServerStatus> {
         // Check if any image needs to be downloaded
         for (name, state) in &mut self.containers {
             if *state == ContainerState::Waiting {
