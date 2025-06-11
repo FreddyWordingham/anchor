@@ -1,9 +1,15 @@
 use std::{fmt::Display, io};
 
+/// Errors that can occur during manifest operations.
+///
+/// Covers serialization, validation, and I/O errors when working with manifest files.
 #[derive(Debug)]
 pub enum ManifestError {
+    /// JSON serialization or deserialization failed
     SerializationError(serde_json::Error),
+    /// Manifest content validation failed (e.g., duplicate ports, invalid names)
     ValidationError(String),
+    /// File I/O operation failed (reading or writing manifest files)
     IoError(io::Error),
 }
 

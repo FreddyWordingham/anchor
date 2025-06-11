@@ -15,16 +15,36 @@ use std::{
 
 use crate::prelude::DockerError;
 
+/// Type alias for Results that may return `DockerError`.
+///
+/// Provides a convenient shorthand for Docker operations that can fail,
+/// eliminating the need to repeatedly specify the error type.
 pub type Result<T> = std::result::Result<T, DockerError>;
 
+/// Client for interacting with the Docker daemon and container registry.
+///
+/// Provides high-level operations for managing Docker images and containers,
+/// including authenticated pulls from registries like AWS ECR. Maintains
+/// connection state and platform information for the Docker environment.
 pub struct DockerClient {
+    /// Handle to the Docker daemon connection
     docker: Docker,
+    /// Registry credentials for authenticated image operations
     credentials: DockerCredentials,
+    /// Platform string (e.g., "linux/amd64") of the Docker host
     platform: String,
 }
 
 impl DockerClient {
-    /// Creates a new `DockerClient` instance by connecting to the Docker socket and and fetching ECR credentials.
+    /// Creates a new Docker client with the provided credentials.
+    ///
+    /// Establishes connection to the local Docker daemon and retrieves platform information.
+    ///
+    /// # Arguments
+    /// * `credentials` - Docker registry credentials for authenticated pulls
+    ///
+    /// # Errors
+    /// Returns `DockerError::ConnectionError` if Docker daemon is unreachable.
     pub async fn new(credentials: DockerCredentials) -> Result<Self> {
         // Try to connect to Docker daemon
         let docker = Docker::connect_with_local_defaults().map_err(|err| DockerError::ConnectionError(err.to_string()))?;
@@ -42,17 +62,24 @@ impl DockerClient {
         })
     }
 
-    /// Get the platform information.
+    /// Returns the platform string (OS/architecture) of the Docker daemon.
+    ///
+    /// Format: "linux/amd64", "darwin/arm64", etc.
     pub fn platform(&self) -> &str {
         &self.platform
     }
 
-    /// Check if Docker daemon is still running.
+    /// Checks if the Docker daemon is still responsive.
+    ///
+    /// Useful for health checks and connection validation.
     pub async fn is_docker_running(&self) -> bool {
         self.docker.version().await.is_ok()
     }
 
-    /// List all downloaded images.
+    /// Lists all Docker images on the system, including intermediate images.
+    ///
+    /// # Errors
+    /// Returns `DockerError::ConnectionError` if the Docker API call fails.
     pub async fn list_images(&self) -> Result<Vec<ImageSummary>> {
         let options = ListImagesOptionsBuilder::default().all(true).build();
         self.docker
@@ -61,8 +88,15 @@ impl DockerClient {
             .map_err(|err| DockerError::ConnectionError(err.to_string()))
     }
 
-    /// Check if a specific image is already pulled.
-    /// Accepts full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest" or "nginx:latest")
+    /// Checks if a specific Docker image is available locally.
+    ///
+    /// Supports both full registry URIs and short tags for matching.
+    ///
+    /// # Arguments
+    /// * `image_reference` - Full image URI or short name (e.g., "nginx:latest")
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the image list cannot be retrieved.
     pub async fn is_image_downloaded<S: AsRef<str>>(&self, image_reference: S) -> Result<bool> {
         let target_ref = image_reference.as_ref();
 
@@ -81,8 +115,16 @@ impl DockerClient {
         Ok(false)
     }
 
-    /// Pull (download) a Docker image.
-    /// Accepts full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest" or "nginx:latest")
+    /// Downloads a Docker image from a registry.
+    ///
+    /// Shows real-time progress during the download process with overwriting output.
+    /// Automatically uses the configured credentials for authenticated registries.
+    ///
+    /// # Arguments
+    /// * `image_reference` - Full image URI to download
+    ///
+    /// # Errors
+    /// Returns `DockerError::ImageError` if the download fails.
     pub async fn pull_image<S: AsRef<str>>(&self, image_reference: S) -> Result<()> {
         let options = CreateImageOptionsBuilder::default()
             .from_image(image_reference.as_ref())
@@ -121,8 +163,15 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Remove (delete) a Docker image.
-    /// Accepts image reference or image ID
+    /// Removes a Docker image from the local system.
+    ///
+    /// Forces removal even if the image is in use by stopped containers.
+    ///
+    /// # Arguments
+    /// * `image_reference` - Image name, tag, or ID to remove
+    ///
+    /// # Errors
+    /// Returns `DockerError::ImageError` if removal fails.
     pub async fn remove_image<S: AsRef<str>>(&self, image_reference: S) -> Result<()> {
         let options = RemoveImageOptionsBuilder::default().force(true).build();
         self.docker
@@ -132,21 +181,40 @@ impl DockerClient {
         Ok(())
     }
 
-    /// List all containers (both running and stopped).
+    /// Lists all containers on the system (running and stopped).
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the container list cannot be retrieved.
     pub async fn list_containers(&self) -> Result<Vec<ContainerSummary>> {
         let options = ListContainersOptionsBuilder::default().all(true).build();
         Ok(self.docker.list_containers(Some(options)).await?)
     }
 
+    /// Lists only currently running containers.
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the container list cannot be retrieved.
     pub async fn list_running_containers(&self) -> Result<Vec<ContainerSummary>> {
         let filters = HashMap::from([("status", vec!["running"])]);
         let options = ListContainersOptionsBuilder::default().all(false).filters(&filters).build();
         Ok(self.docker.list_containers(Some(options)).await?)
     }
 
-    /// Create a Docker container from an image.
-    /// image_reference: Full image reference (e.g., "my-registry.amazonaws.com/my-repo:latest")
-    /// container_name: Name to assign to the container
+    /// Creates a new Docker container from an image with port mappings.
+    ///
+    /// The container is created but not started. Configures port bindings
+    /// to map container ports to host ports.
+    ///
+    /// # Arguments
+    /// * `image_reference` - Docker image to create container from
+    /// * `container_name` - Name to assign to the new container
+    /// * `port_mappings` - Array of (container_port, host_port) tuples
+    ///
+    /// # Returns
+    /// The container ID of the created container.
+    ///
+    /// # Errors
+    /// Returns `DockerError::ContainerError` if creation fails or image doesn't exist.
     pub async fn build_container<S: AsRef<str>, T: AsRef<str>>(
         &self,
         image_reference: S,
@@ -206,7 +274,13 @@ impl DockerClient {
         Ok(container_info.id)
     }
 
-    /// Check if a container with the given name exists.
+    /// Checks if a container with the given name exists (built but may not be running).
+    ///
+    /// # Arguments
+    /// * `container_name` - Name of the container to check
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the container list cannot be retrieved.
     pub async fn is_container_built<S: AsRef<str>>(&self, container_name: S) -> Result<bool> {
         let mut built = false;
         for container in self.list_containers().await? {
@@ -222,7 +296,13 @@ impl DockerClient {
         Ok(built)
     }
 
-    /// Check if a container with the given name is currently running.
+    /// Checks if a container with the given name is currently running.
+    ///
+    /// # Arguments
+    /// * `container_name` - Name of the container to check
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the container status cannot be determined.
     pub async fn is_container_running<S: AsRef<str>>(&self, container_name: S) -> Result<bool> {
         let mut running = false;
         for container in self.list_running_containers().await? {
@@ -238,7 +318,15 @@ impl DockerClient {
         Ok(running)
     }
 
-    /// Start a Docker container by name or ID.
+    /// Starts an existing Docker container.
+    ///
+    /// The container must already be created (built) before it can be started.
+    ///
+    /// # Arguments
+    /// * `container_name_or_id` - Container name or ID to start
+    ///
+    /// # Errors
+    /// Returns `DockerError::ContainerError` if the container cannot be started.
     pub async fn start_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = StartContainerOptionsBuilder::default().build();
         self.docker
@@ -251,7 +339,15 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Stop a Docker container by name or ID.
+    /// Stops a running Docker container gracefully.
+    ///
+    /// Sends SIGTERM and waits up to 10 seconds before forcing termination.
+    ///
+    /// # Arguments
+    /// * `container_name_or_id` - Container name or ID to stop
+    ///
+    /// # Errors
+    /// Returns `DockerError::ContainerError` if the container cannot be stopped.
     pub async fn stop_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = StopContainerOptionsBuilder::default()
             .t(10) // 10 seconds timeout
@@ -265,7 +361,15 @@ impl DockerClient {
         Ok(())
     }
 
-    /// Remove (delete) a Docker container by name or ID.
+    /// Forcefully removes a Docker container.
+    ///
+    /// Removes the container even if it's currently running.
+    ///
+    /// # Arguments
+    /// * `container_name_or_id` - Container name or ID to remove
+    ///
+    /// # Errors
+    /// Returns `DockerError::ContainerError` if removal fails.
     pub async fn remove_container<S: AsRef<str>>(&self, container_name_or_id: S) -> Result<()> {
         let options = RemoveContainerOptionsBuilder::default().force(true).build();
         self.docker

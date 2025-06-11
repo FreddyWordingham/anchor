@@ -4,19 +4,36 @@ use std::{
 };
 
 use crate::{
-    cluster_status::ClusterStatus, command::Command, container_state::ContainerState, docker_client::DockerClient,
-    docker_error::DockerError, manifest::Manifest,
+    cluster_status::ClusterStatus,
+    command::Command,
+    container_state::ContainerState,
+    docker_client::{DockerClient, Result},
+    docker_error::DockerError,
+    manifest::Manifest,
 };
 
-type Result<T> = std::result::Result<T, DockerError>;
-
+/// Manages a collection of Docker containers as a cohesive cluster.
+///
+/// Handles the complete lifecycle of downloading images, building containers,
+/// and coordinating startup/shutdown across multiple containers defined in a manifest.
 pub struct Cluster<'a> {
+    /// The Docker client used to interact with the Docker daemon.
     client: &'a DockerClient,
+    /// The manifest defining the containers in this cluster.
     manifest: Manifest,
+    /// The current state of each container in the cluster.
     containers: HashMap<String, ContainerState>,
 }
 
 impl<'a> Cluster<'a> {
+    /// Creates a new cluster from a manifest and synchronizes with the current Docker state.
+    ///
+    /// # Arguments
+    /// * `client` - Docker client for container operations
+    /// * `manifest` - Container definitions and configuration
+    ///
+    /// # Errors
+    /// Returns `DockerError` if Docker daemon is unreachable or container state cannot be determined.
     pub async fn new(client: &'a DockerClient, manifest: Manifest) -> Result<Self> {
         let mut containers = HashMap::new();
 
@@ -38,7 +55,13 @@ impl<'a> Cluster<'a> {
         Ok(cluster)
     }
 
-    /// Syncronize the `Cluster` state with the Docker daemon.
+    /// Synchronizes cluster state with the actual Docker daemon state.
+    ///
+    /// Updates internal container states to match what's currently running in Docker.
+    /// Should be called periodically or after external Docker operations.
+    ///
+    /// # Errors
+    /// Returns `DockerError` if Docker daemon is unreachable or state cannot be determined.
     pub async fn sync(&mut self) -> Result<()> {
         // Check if Docker is running
         if !self.client.is_docker_running().await {
@@ -76,7 +99,16 @@ impl<'a> Cluster<'a> {
         Ok(())
     }
 
-    /// Start all containers with a callback for each status update
+    /// Starts all containers in the cluster, progressing each to its target command state.
+    ///
+    /// Executes containers in dependency order (images → containers → running).
+    /// Calls the provided callback for each state transition to provide progress feedback.
+    ///
+    /// # Arguments
+    /// * `callback` - Function called for each state transition with the new status
+    ///
+    /// # Errors
+    /// Returns `DockerError` if any container operation fails.
     pub async fn start<F>(&mut self, mut callback: F) -> Result<()>
     where
         F: FnMut(&ClusterStatus),
@@ -93,8 +125,17 @@ impl<'a> Cluster<'a> {
         Ok(())
     }
 
-    /// Perform the next step in starting the cluster containers.
-    /// Return the status of the step which was just performed.
+    /// Executes the next step in the cluster startup process.
+    ///
+    /// Finds the first container needing progression and advances it one state.
+    /// Returns the status of the operation that was just completed.
+    ///
+    /// # Returns
+    /// * `ClusterStatus::Downloaded/Built/Running(name)` - Next step completed for named container
+    /// * `ClusterStatus::Ready` - All containers have reached their target states
+    ///
+    /// # Errors
+    /// Returns `DockerError` if the Docker operation fails.
     async fn next(&mut self) -> Result<ClusterStatus> {
         // Check if any image needs to be downloaded
         for (name, state) in &mut self.containers {
@@ -167,7 +208,13 @@ impl<'a> Cluster<'a> {
         Ok(ClusterStatus::Ready)
     }
 
-    /// Stop all running containers and reduce their state to `ContainerState::Built`.
+    /// Stops all running containers in the cluster.
+    ///
+    /// Reduces container states from `Running` to `Built`, leaving containers
+    /// available for restart without rebuilding.
+    ///
+    /// # Errors
+    /// Returns `DockerError` if any container cannot be stopped.
     pub async fn stop(&mut self) -> Result<()> {
         // Ensure the cluster containers are in sync before stopping containers
         self.sync().await?;

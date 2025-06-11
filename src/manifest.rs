@@ -8,28 +8,62 @@ use std::{
 
 use crate::{container::Container, manifest_error::ManifestError};
 
+/// Declarative configuration defining a cluster of Docker containers.
+///
+/// A manifest specifies the complete configuration for a multi-container
+/// application, including image sources, port mappings, and lifecycle commands.
+/// Can be serialized to/from JSON for persistent storage and sharing.
+///
+/// # Example
+/// ```json
+/// {
+///   "containers": {
+///     "web": {
+///       "uri": "nginx:latest",
+///       "port_mappings": [[80, 8080]],
+///       "command": "Run"
+///     }
+///   }
+/// }
+/// ```
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Manifest {
+    /// Map of container names to their configuration.
+    /// Container names must be unique and serve as identifiers throughout the cluster.
     pub containers: HashMap<String, Container>,
 }
 
 impl Manifest {
-    /// Construct a new `Manifest` with the given `Container`s configurations.
+    /// Creates a new manifest with the given container configurations.
+    ///
+    /// Validates that all host port mappings are unique across containers.
+    ///
+    /// # Arguments
+    /// * `containers` - Map of container names to their configurations
+    ///
+    /// # Errors
+    /// Returns `ManifestError::ValidationError` if port conflicts are detected.
     pub fn new(containers: HashMap<String, Container>) -> Result<Self, ManifestError> {
         let manifest = Manifest { containers };
         manifest.validate()?;
         Ok(manifest)
     }
 
-    /// Construct a new empty `Manifest`.
+    /// Creates an empty manifest with no containers.
+    ///
+    /// Useful as a starting point for programmatically building manifests.
     pub fn empty() -> Self {
         Manifest {
             containers: HashMap::new(),
         }
     }
 
-    /// Validate that the `Manifest` is well-formed.
-    /// All host ports must be unique across all containers.
+    /// Validates the manifest for structural correctness and port uniqueness.
+    ///
+    /// Ensures all host ports are unique across all containers to prevent conflicts.
+    ///
+    /// # Errors
+    /// Returns `ManifestError::ValidationError` if validation fails.
     pub fn validate(&self) -> Result<(), ManifestError> {
         // Check for that all ports are unique
         let mut seen_ports = HashSet::new();
@@ -46,14 +80,24 @@ impl Manifest {
         Ok(())
     }
 
-    /// Access the `Container`s in the `Manifest`.
+    /// Returns a reference to the containers map.
+    ///
+    /// Provides read-only access to all container configurations in the manifest.
     pub fn containers(&self) -> &HashMap<String, Container> {
         &self.containers
     }
 
-    /// Add a `Container` to the `Manifest`.
-    /// Returns an error if a container with the same name already exists.
-    /// Returns an error if the container's port mappings are not unique across the manifest.
+    /// Adds a new container to the manifest.
+    ///
+    /// Validates that the container name is unique and port mappings don't conflict
+    /// with existing containers.
+    ///
+    /// # Arguments
+    /// * `name` - Unique identifier for the container
+    /// * `container` - Container configuration
+    ///
+    /// # Errors
+    /// * `ManifestError::ValidationError` - If name exists or ports conflict
     pub fn add_container(&mut self, name: String, container: Container) -> Result<(), ManifestError> {
         if self.containers.contains_key(&name) {
             return Err(ManifestError::ValidationError(format!(
@@ -65,30 +109,55 @@ impl Manifest {
         self.validate()?;
         Ok(())
     }
-}
 
-// (De)Serialisation.
-impl Manifest {
-    /// Serialize to a JSON string.
+    /// Serializes the manifest to a pretty-printed JSON string.
+    ///
+    /// # Errors
+    /// Returns `serde_json::Error` if serialization fails.
     pub fn to_json(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(self)
     }
 
-    /// Deserialize an instance from a JSON string.
+    /// Deserializes a manifest from a JSON string.
+    ///
+    /// Validates the resulting manifest after deserialization.
+    ///
+    /// # Arguments
+    /// * `s` - JSON string containing manifest data
+    ///
+    /// # Errors
+    /// * `ManifestError::SerializationError` - If JSON parsing fails
+    /// * `ManifestError::ValidationError` - If the parsed manifest is invalid
     pub fn from_json(s: &str) -> Result<Self, ManifestError> {
         let manifest: Self = serde_json::from_str(s)?;
         manifest.validate()?;
         Ok(manifest)
     }
 
-    /// Save (serialize) to the given file path (overwrites if exists).
+    /// Saves the manifest to a file as JSON.
+    ///
+    /// Overwrites the file if it already exists.
+    ///
+    /// # Arguments
+    /// * `path` - File path where the manifest should be saved
+    ///
+    /// # Errors
+    /// Returns `io::Error` if file operations fail.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), io::Error> {
         let json = self.to_json().map_err(io::Error::other)?;
         let mut file = File::create(path)?;
         file.write_all(json.as_bytes())
     }
 
-    /// Load (deserialize) an instance from the given file path.
+    /// Loads a manifest from a JSON file.
+    ///
+    /// # Arguments
+    /// * `path` - File path to read the manifest from
+    ///
+    /// # Errors
+    /// * `ManifestError::IoError` - If file cannot be read
+    /// * `ManifestError::SerializationError` - If JSON parsing fails
+    /// * `ManifestError::ValidationError` - If the loaded manifest is invalid
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, ManifestError> {
         let mut file = File::open(path)?;
         let mut contents = String::new();
