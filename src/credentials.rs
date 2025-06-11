@@ -5,6 +5,9 @@ use bollard::auth::DockerCredentials;
 use std::error::Error;
 
 /// Get Docker credentials for AWS ECR (Elastic Container Registry).
+///
+/// # Errors
+/// Returns an error if the AWS SDK fails to load configuration, or if the ECR API call fails.
 pub async fn get_ecr_credentials() -> Result<DockerCredentials, Box<dyn Error>> {
     // 1. Load AWS config from environment (reads AWS_ACCESS_KEY_ID, etc.)
     let config = load_defaults(BehaviorVersion::latest()).await;
@@ -15,7 +18,7 @@ pub async fn get_ecr_credentials() -> Result<DockerCredentials, Box<dyn Error>> 
         .get_authorization_token()
         .send()
         .await
-        .map_err(|err: _| format!("ECR GetAuthToken failed: {}", err))?;
+        .map_err(|err: _| format!("ECR GetAuthToken failed: {err}"))?;
 
     // 3. Extract the first (and usually only) auth data
     let auth_data = resp
