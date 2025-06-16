@@ -75,6 +75,7 @@
 mod cluster;
 mod cluster_status;
 mod command;
+mod configuration;
 mod container;
 mod container_state;
 mod docker_client;
@@ -88,8 +89,8 @@ mod credentials;
 /// Re-export the main types and traits for easy access
 pub mod prelude {
     pub use crate::{
-        cluster::Cluster, cluster_status::ClusterStatus, command::Command, container::Container, docker_client::DockerClient,
-        docker_error::DockerError, manifest::Manifest, manifest_error::ManifestError,
+        cluster::Cluster, cluster_status::ClusterStatus, command::Command, configuration::Configuration, container::Container,
+        docker_client::DockerClient, docker_error::DockerError, manifest::Manifest, manifest_error::ManifestError,
     };
 
     #[cfg(feature = "aws_ecr")]
