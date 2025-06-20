@@ -7,7 +7,7 @@ use crate::anchor_error::{AnchorError, AnchorResult};
 /// # Errors
 /// Returns `AnchorError::ConnectionError` if the start command fails.
 pub fn start_docker_daemon() -> AnchorResult<()> {
-    let result = if cfg!(target_os = "macos") {
+    if cfg!(target_os = "macos") {
         // On macOS, try to start Docker Desktop
         start_docker_macos()
     } else if cfg!(target_os = "windows") {
@@ -16,9 +16,7 @@ pub fn start_docker_daemon() -> AnchorResult<()> {
     } else {
         // On Linux, try to start Docker service
         start_docker_linux()
-    };
-
-    result
+    }
 }
 
 /// Starts Docker Desktop on macOS.
@@ -33,8 +31,7 @@ fn start_docker_macos() -> AnchorResult<()> {
             Ok(output) if output.status.success() => {
                 return Ok(());
             }
-            Ok(_) => continue,  // Try next path
-            Err(_) => continue, // Try next path
+            Ok(_) | Err(_) => {} // Try next path
         }
     }
 
@@ -66,8 +63,7 @@ fn start_docker_windows() -> AnchorResult<()> {
             Ok(output) if output.status.success() => {
                 return Ok(());
             }
-            Ok(_) => continue,  // Try next path
-            Err(_) => continue, // Try next path
+            Ok(_) | Err(_) => {} // Try next path
         }
     }
 

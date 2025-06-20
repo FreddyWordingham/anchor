@@ -84,6 +84,7 @@ impl MountType {
     }
 
     /// Returns the target path in the container
+    #[must_use]
     pub fn target(&self) -> &str {
         match self {
             Self::Bind { target, .. } | Self::Volume { target, .. } | Self::AnonymousVolume { target, .. } => target,
@@ -91,6 +92,7 @@ impl MountType {
     }
 
     /// Returns the source path (if applicable)
+    #[must_use]
     pub fn source(&self) -> Option<&str> {
         match self {
             Self::Bind { source, .. } | Self::Volume { source, .. } => Some(source),
@@ -99,7 +101,8 @@ impl MountType {
     }
 
     /// Returns whether the mount is read-only
-    pub fn is_read_only(&self) -> bool {
+    #[must_use]
+    pub const fn is_read_only(&self) -> bool {
         match self {
             Self::Bind { read_only, .. } | Self::Volume { read_only, .. } | Self::AnonymousVolume { read_only, .. } => {
                 *read_only
@@ -108,7 +111,8 @@ impl MountType {
     }
 
     /// Returns the mount type as a string for Docker API
-    pub fn mount_type_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn mount_type_str(&self) -> &'static str {
         match self {
             Self::Bind { .. } => "bind",
             Self::Volume { .. } | Self::AnonymousVolume { .. } => "volume",
@@ -123,21 +127,18 @@ impl Display for MountType {
                 source,
                 target,
                 read_only,
-            } => {
-                let mode = if *read_only { "ro" } else { "rw" };
-                write!(fmt, "{}:{}:{}", source, target, mode)
             }
-            Self::Volume {
+            | Self::Volume {
                 source,
                 target,
                 read_only,
             } => {
                 let mode = if *read_only { "ro" } else { "rw" };
-                write!(fmt, "{}:{}:{}", source, target, mode)
+                write!(fmt, "{source}:{target}:{mode}")
             }
             Self::AnonymousVolume { target, read_only } => {
                 let mode = if *read_only { "ro" } else { "rw" };
-                write!(fmt, "{}:{}", target, mode)
+                write!(fmt, "{target}:{mode}")
             }
         }
     }

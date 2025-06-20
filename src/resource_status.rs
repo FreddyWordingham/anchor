@@ -15,26 +15,27 @@ pub enum ResourceStatus {
 
 impl ResourceStatus {
     /// Returns true if the resource is in Missing state
-    pub fn is_missing(&self) -> bool {
-        matches!(self, ResourceStatus::Missing)
+    #[must_use]
+    pub const fn is_missing(&self) -> bool {
+        matches!(self, Self::Missing)
     }
 
     /// Returns true if the resource is at least available (Available, Built, or Running)
-    pub fn is_available(&self) -> bool {
-        matches!(
-            self,
-            ResourceStatus::Available | ResourceStatus::Built | ResourceStatus::Running
-        )
+    #[must_use]
+    pub const fn is_available(&self) -> bool {
+        matches!(self, Self::Available | Self::Built | Self::Running)
     }
 
     /// Returns true if the resource is at least built (Built or Running)
-    pub fn is_built(&self) -> bool {
-        matches!(self, ResourceStatus::Built | ResourceStatus::Running)
+    #[must_use]
+    pub const fn is_built(&self) -> bool {
+        matches!(self, Self::Built | Self::Running)
     }
 
     /// Returns true if the resource is in Running state
-    pub fn is_running(&self) -> bool {
-        matches!(self, ResourceStatus::Running)
+    #[must_use]
+    pub const fn is_running(&self) -> bool {
+        matches!(self, Self::Running)
     }
 }
 

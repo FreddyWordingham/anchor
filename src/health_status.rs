@@ -16,10 +16,10 @@ pub enum HealthStatus {
 impl Display for HealthStatus {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
         match self {
-            HealthStatus::Starting => write!(fmt, "starting"),
-            HealthStatus::Healthy => write!(fmt, "healthy"),
-            HealthStatus::Unhealthy => write!(fmt, "unhealthy"),
-            HealthStatus::None => write!(fmt, "none"),
+            Self::Starting => write!(fmt, "starting"),
+            Self::Healthy => write!(fmt, "healthy"),
+            Self::Unhealthy => write!(fmt, "unhealthy"),
+            Self::None => write!(fmt, "none"),
         }
     }
 }

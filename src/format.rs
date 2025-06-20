@@ -17,9 +17,9 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 
     if unit_index == 0 {
-        format!("{} {}", bytes, UNITS[unit_index])
+        format!("{bytes} {}", UNITS[unit_index])
     } else {
-        format!("{:.1} {}", size, UNITS[unit_index])
+        format!("{size:.1} {}", UNITS[unit_index])
     }
 }
 
@@ -28,30 +28,30 @@ pub fn format_duration(duration: Duration) -> String {
     let total_seconds = duration.as_secs();
 
     if total_seconds < 60 {
-        format!("{}s", total_seconds)
+        format!("{total_seconds}s")
     } else if total_seconds < 3600 {
         let minutes = total_seconds / 60;
         let seconds = total_seconds % 60;
         if seconds == 0 {
-            format!("{}m", minutes)
+            format!("{minutes}m")
         } else {
-            format!("{}m{}s", minutes, seconds)
+            format!("{minutes}m{seconds}s")
         }
     } else if total_seconds < 86400 {
         let hours = total_seconds / 3600;
         let minutes = (total_seconds % 3600) / 60;
         if minutes == 0 {
-            format!("{}h", hours)
+            format!("{hours}h")
         } else {
-            format!("{}h{}m", hours, minutes)
+            format!("{hours}h{minutes}m")
         }
     } else {
         let days = total_seconds / 86400;
         let hours = (total_seconds % 86400) / 3600;
         if hours == 0 {
-            format!("{}d", days)
+            format!("{days}d")
         } else {
-            format!("{}d{}h", days, hours)
+            format!("{days}d{hours}h")
         }
     }
 }

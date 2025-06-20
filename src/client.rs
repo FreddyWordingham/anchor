@@ -173,24 +173,20 @@ impl Client {
             false
         });
 
-        match container {
-            None => Ok(ResourceStatus::Missing),
-            Some(container) => {
-                let state = container
-                    .state
-                    .as_ref()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
+        container.map_or(Ok(ResourceStatus::Missing), |container| {
+            let state = container
+                .state
+                .as_ref()
+                .map_or_else(|| "unknown".to_string(), std::string::ToString::to_string);
 
-                if state == "running" {
-                    // Container is running
-                    Ok(ResourceStatus::Running)
-                } else {
-                    // Container exists but is not running
-                    Ok(ResourceStatus::Built)
-                }
+            if state == "running" {
+                // Container is running
+                Ok(ResourceStatus::Running)
+            } else {
+                // Container exists but is not running
+                Ok(ResourceStatus::Built)
             }
-        }
+        })
     }
 
     /// Gets detailed runtime metrics for a container.
@@ -288,15 +284,18 @@ impl Client {
 
             // Get health status
             if let Some(health) = state.health {
-                metrics.health_status = Some(match health.status.as_ref() {
-                    Some(status) => match status.to_string().as_str() {
-                        "starting" => HealthStatus::Starting,
-                        "healthy" => HealthStatus::Healthy,
-                        "unhealthy" => HealthStatus::Unhealthy,
-                        _ => HealthStatus::None,
-                    },
-                    None => HealthStatus::None,
-                });
+                metrics.health_status =
+                    Some(
+                        health
+                            .status
+                            .as_ref()
+                            .map_or(HealthStatus::None, |status| match status.to_string().as_str() {
+                                "starting" => HealthStatus::Starting,
+                                "healthy" => HealthStatus::Healthy,
+                                "unhealthy" => HealthStatus::Unhealthy,
+                                _ => HealthStatus::None,
+                            }),
+                    );
             }
         }
 
@@ -340,8 +339,8 @@ impl Client {
                 if let Some(io_service_bytes) = &blkio.io_service_bytes_recursive {
                     for entry in io_service_bytes {
                         match entry.op.as_deref() {
-                            Some("read") | Some("Read") => metrics.block_read_bytes += entry.value.unwrap_or(0),
-                            Some("write") | Some("Write") => metrics.block_write_bytes += entry.value.unwrap_or(0),
+                            Some("read" | "Read") => metrics.block_read_bytes += entry.value.unwrap_or(0),
+                            Some("write" | "Write") => metrics.block_write_bytes += entry.value.unwrap_or(0),
                             _ => {}
                         }
                     }
@@ -517,7 +516,7 @@ impl Client {
                         driver_config: None,
                         subpath: None,
                     }),
-                    _ => None,
+                    MountType::Bind { .. } => None,
                 },
                 tmpfs_options: None,
                 image_options: None,

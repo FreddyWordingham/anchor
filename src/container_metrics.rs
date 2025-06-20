@@ -40,8 +40,9 @@ pub struct ContainerMetrics {
 }
 
 impl ContainerMetrics {
-    /// Create a new ContainerMetrics with default values
-    pub fn new() -> Self {
+    /// Create a new `ContainerMetrics` with default values
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             uptime: Duration::from_secs(0),
             memory_usage: 0,
@@ -69,6 +70,7 @@ impl ContainerMetrics {
     }
 
     /// Get formatted memory usage string
+    #[must_use]
     pub fn memory_usage_display(&self) -> String {
         match (self.memory_percentage, self.memory_limit) {
             (Some(pct), Some(limit)) => {
@@ -79,6 +81,7 @@ impl ContainerMetrics {
     }
 
     /// Get formatted network usage string
+    #[must_use]
     pub fn network_usage_display(&self) -> String {
         format!(
             "↓{} ↑{}",
@@ -88,6 +91,7 @@ impl ContainerMetrics {
     }
 
     /// Get formatted disk I/O string
+    #[must_use]
     pub fn disk_io_display(&self) -> String {
         format!(
             "R:{} W:{}",
