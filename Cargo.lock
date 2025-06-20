@@ -36,7 +36,6 @@ dependencies = [
  "bollard",
  "chrono",
  "futures-util",
- "hyper 1.6.0",
  "tokio",
 ]
 

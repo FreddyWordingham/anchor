@@ -177,7 +177,7 @@ impl Client {
             let state = container
                 .state
                 .as_ref()
-                .map_or_else(|| "unknown".to_string(), std::string::ToString::to_string);
+                .map_or_else(|| "unknown".to_string(), ToString::to_string);
 
             if state == "running" {
                 // Container is running

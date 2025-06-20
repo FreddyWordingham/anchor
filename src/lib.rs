@@ -2,7 +2,7 @@
 
 #![deny(absolute_paths_not_starting_with_crate)]
 #![deny(ambiguous_negative_literals)]
-// #![deny(dead_code)] ////////// Turn on before release
+#![deny(dead_code)]
 #![deny(deprecated_safe_2024)]
 #![deny(deref_into_dyn_supertrait)]
 #![deny(edition_2024_expr_fragment_specifier)]
@@ -43,18 +43,18 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![deny(unstable_features)]
 #![deny(unused_assignments)]
-// #![deny(unused_crate_dependencies)] ////////// Turn on before release
-// #![deny(unused_extern_crates)] ////////// Turn on before release
-// #![deny(unused_import_braces)] ////////// Turn on before release
-// #![deny(unused_imports)] ////////// Turn on before release
-// #![deny(unused_lifetimes)] ////////// Turn on before release
-// #![deny(unused_macro_rules)] ////////// Turn on before release
-// #![deny(unused_must_use)] ////////// Turn on before release
-// #![deny(unused_mut)] ////////// Turn on before release
-// #![deny(unused_qualifications)] ////////// Turn on before release
-// #![deny(unused_results)] ////////// Turn on before release
-// #![deny(unused_variables)] ////////// Turn on before release
-// #![deny(unused)] ////////// Turn on before release
+#![deny(unused_crate_dependencies)]
+#![deny(unused_extern_crates)]
+#![deny(unused_import_braces)]
+#![deny(unused_imports)]
+#![deny(unused_lifetimes)]
+#![deny(unused_macro_rules)]
+#![deny(unused_must_use)]
+#![deny(unused_mut)]
+#![deny(unused_qualifications)]
+#![deny(unused_results)]
+#![deny(unused_variables)]
+#![deny(unused)]
 #![deny(variant_size_differences)]
 // #![deny(warnings)]
 #![deny(clippy::all)]
