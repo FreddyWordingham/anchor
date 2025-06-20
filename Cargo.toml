@@ -1,6 +1,6 @@
 [package]
 name = "anchor"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Freddy Wordingham <freddy@digilab.ai>"]
 description = "A Rust library for managing Docker container clusters through declarative JSON manifests"
