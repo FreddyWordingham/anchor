@@ -320,7 +320,7 @@ impl Client {
                                 .saturating_sub(precpu.system_cpu_usage.unwrap_or(0));
 
                             if system_delta > 0 {
-                                let cpu_count = cpu.online_cpus.unwrap_or(1) as f64;
+                                let cpu_count = f64::from(cpu.online_cpus.unwrap_or(1));
                                 metrics.cpu_percentage = (cpu_delta as f64 / system_delta as f64) * cpu_count * 100.0;
                             }
                         }

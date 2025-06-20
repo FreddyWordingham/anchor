@@ -67,6 +67,8 @@
 // // #![deny(clippy::restriction)]
 #![deny(clippy::style)]
 #![deny(clippy::suspicious)]
+#![expect(clippy::cast_precision_loss, reason = "Some casts are necessary here.")]
+#![expect(clippy::cast_sign_loss, reason = "Some casts are necessary here.")]
 #![expect(
     clippy::multiple_crate_versions,
     reason = "Multiple versions of some dependencies are used in the workspace, but they are compatible and do not cause issues."
