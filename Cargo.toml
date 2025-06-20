@@ -1,6 +1,6 @@
 [package]
 name = "anchor"
-version = "0.0.3"
+version = "0.1.0"
 edition = "2024"
 authors = ["Freddy Wordingham <freddy@digilab.ai>"]
 description = "A Rust library for managing Docker container clusters through declarative JSON manifests"
@@ -21,6 +21,7 @@ aws-config = { version = "1.6.3", optional = true }
 aws-sdk-ecr = { version = "1.78.0", optional = true }
 base64 = { version = "0.22.1", optional = true }
 bollard = "0.19.0"
+chrono = "0.4.41"
 futures-util = "0.3.31"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
@@ -32,56 +33,17 @@ tokio = { version = "1.45.1", features = [
     "io-std",
 ] }
 
+
 [[example]]
-name = "build_container"
+name = "get_resource_status"
 required-features = ["aws_ecr"]
 
 [[example]]
-name = "get_platform"
+name = "get_container_metrics"
 required-features = ["aws_ecr"]
 
 [[example]]
-name = "is_docker_running"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "list_containers"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "list_images"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "load_manifest"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "pull_image"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "remove_container"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "remove_image"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "save_manifest"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "start_cluster"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "start_container"
-required-features = ["aws_ecr"]
-
-[[example]]
-name = "stop_cluster"
+name = "next_lifecycle"
 required-features = ["aws_ecr"]
 
 [[example]]

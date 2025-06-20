@@ -12,277 +12,248 @@
 [![Documentation](https://docs.rs/anchor/badge.svg)](https://docs.rs/anchor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Rust library for managing Docker container clusters through declarative JSON manifests. Anchor simplifies the process of downloading images, building containers, and orchestrating multi-container applications.
+A Rust library for managing Docker container clusters from Rust.
+Anchor simplifies the process of downloading images, building containers, and orchestrating multi-container applications.
 
 ## Features
 
-- **Declarative Configuration**: Define your container cluster using JSON manifests
-- **State Management**: Track container states (Waiting, Downloaded, Built, Running)
-- **Port Management**: Automatic port mapping with uniqueness validation
-- **Progress Tracking**: Real-time feedback during cluster operations
-- **Error Handling**: Comprehensive error types for debugging
-- **ECR Integration**: Optional support for AWS ECR credentials integration
+- 🐳 **Docker Container Management** - Create, start, stop, and monitor Docker containers
+- 📊 **Real-time Metrics** - Collect detailed runtime metrics including CPU, memory, and network usage
+- 🔒 **AWS ECR Integration** - Seamless authentication with Amazon Elastic Container Registry
+- 💾 **Flexible Mount Support** - Bind mounts, named volumes, and anonymous volumes
+- 🔍 **Resource Status Tracking** - Track the lifecycle status of images and containers
+- 🚀 **Cross-platform** - Works on Linux, macOS, and Windows
+- ⚡ **Async/Await** - Built with modern async Rust for high performance
 
-## Quick Start
+## Installation
 
-### 1. Add to Cargo.toml
+Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-anchor = "0.0.0"
+anchor = "0.1.0"
+
+# Enable AWS ECR support (optional)
+anchor = { version = "0.1.0", features = ["aws_ecr"] }
 ```
 
-> Add support for ECR with `anchor = { version = "0.0.0", features = ["ecr"] }`
-
-### 2. Write a Manifest
-
-```json
-{
-  "containers": {
-    "web": {
-      "uri": "docker.io/library/nginx:latest",
-      "port_mappings": [[80, 8080]],
-      "command": "Run"
-    },
-    "db": {
-      "uri": "docker.io/library/postgres:latest",
-      "port_mappings": [[5432, 5432]],
-      "command": "Run"
-    }
-  }
-}
-```
-
-### 3. Start Your Cluster
+## Quick Start
 
 ```rust
 use anchor::prelude::*;
+use bollard::auth::DockerCredentials;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // Load manifest
-    let manifest = Manifest::load("manifest.json")?;
+async fn main() -> AnchorResult<()> {
+    // Create a Docker client
+    let client = Client::new(DockerCredentials::default()).await?;
 
-    // Setup Docker client with credentials
-    let credentials = get_docker_credentials().await?;
-    let client = DockerClient::new(credentials).await?;
-
-    // Create and start cluster
-    let mut cluster = Cluster::new(&client, manifest).await?;
-    cluster.start(|status| {
-        println!("Status: {:?}", status);
-    }).await?;
-
-    println!("✅ All containers are ready!");
-    Ok(())
-}
-```
-
-## Core Components
-
-### Manifest
-
-The `Manifest` struct defines your container cluster configuration:
-
-```json
-{
-  "containers": {
-    "web": {
-      "uri": "nginx:latest",
-      "command": "Run",
-      "port_mappings": [[80, 8080]]
-    },
-    "db": {
-      "uri": "postgres:latest",
-      "command": "Run",
-      "port_mappings": [[5432, 5432]]
+    // Check if Docker is running
+    if !client.is_docker_running().await {
+        start_docker_daemon()?;
     }
-  }
-}
-```
 
-You can also specify a manfest programmatically in Rust:
+    // Pull an image
+    client.pull_image("nginx:latest").await?;
 
-```rust
-let mut manifest = Manifest::empty();
+    // Create and start a container
+    let container_id = client.build_container(
+        "nginx:latest",
+        "my-nginx",
+        &[(80, 8080)], // Port mapping: container:host
+        &[("ENV_VAR", "value")], // Environment variables
+        &[MountType::bind("/host/path", "/container/path")], // Mounts
+    ).await?;
 
-// Add a web server
-manifest.add_container(
-    "web".to_string(),
-    Container {
-        uri: "nginx:latest".to_string(),
-        command: Command::Run,
-        port_mappings: vec![(80, 8080)],
-    },
-)?;
+    client.start_container("my-nginx").await?;
 
-// Add a database
-manifest.add_container(
-    "db".to_string(),
-    Container {
-        uri: "postgres:latest".to_string(),
-        command: Command::Run,
-        port_mappings: vec![(5432, 5432)],
-    },
-)?;
-
-// Save to file
-manifest.save("manifest.json")?;
-```
-
-### Container Commands
-
-- **`Ignore`**: Skip this container entirely
-- **`Download`**: Only download the image
-- **`Build`**: Download image and create container
-- **`Run`**: Download, build, and start the container
-
-### Container States
-
-Anchor tracks each container through these states:
-
-- **`Waiting`**: Initial state, nothing done yet
-- **`Downloaded`**: Docker image has been pulled
-- **`Built`**: Container has been created from image
-- **`Running`**: Container is actively running
-
-### Cluster Operations
-
-```rust
-// Create cluster
-let mut cluster = Cluster::new(&client, manifest).await?;
-
-// Start all containers with progress callback
-cluster.start(|status| match status {
-    ClusterStatus::Downloaded(name) => println!("📥 Downloaded: {}", name),
-    ClusterStatus::Built(name) => println!("🔨 Built: {}", name),
-    ClusterStatus::Running(name) => println!("🚀 Running: {}", name),
-    ClusterStatus::Ready => println!("✅ All ready!"),
-}).await?;
-
-// Stop all containers
-cluster.stop().await?;
-
-// Check current state
-println!("{}", cluster); // Displays all container states
-```
-
-## Error Handling
-
-Anchor provides detailed error types:
-
-```rust
-use anchor::prelude::*;
-
-match result {
-    Err(DockerError::ConnectionError(msg)) => {
-        eprintln!("Docker connection failed: {}", msg);
-    },
-    Err(DockerError::ImageError { image, message }) => {
-        eprintln!("Image '{}' error: {}", image, message);
-    },
-    Err(DockerError::ContainerError { container, message }) => {
-        eprintln!("Container '{}' error: {}", container, message);
-    },
-    Ok(_) => println!("Success!"),
-}
-```
-
-## Examples
-
-### Basic Web Application
-
-```rust
-use anchor::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut manifest = Manifest::empty();
-
-    // Frontend
-    manifest.add_container("frontend".to_string(), Container {
-        uri: "nginx:alpine".to_string(),
-        command: Command::Run,
-        port_mappings: vec![(80, 3000)],
-    })?;
-
-    // Backend API
-    manifest.add_container("api".to_string(), Container {
-        uri: "node:18-alpine".to_string(),
-        command: Command::Run,
-        port_mappings: vec![(8000, 8000)],
-    })?;
-
-    // Database
-    manifest.add_container("database".to_string(), Container {
-        uri: "postgres:15".to_string(),
-        command: Command::Run,
-        port_mappings: vec![(5432, 5432)],
-    })?;
-
-    // Save and start
-    manifest.save("web-app.json")?;
-
-    let credentials = get_docker_credentials().await?;
-    let client = DockerClient::new(credentials).await?;
-    let mut cluster = Cluster::new(&client, manifest).await?;
-
-    cluster.start(|status| {
-        println!("🔄 {:?}", status);
-    }).await?;
-
-    println!("🌐 Web application running!");
-    println!("Frontend: http://localhost:3000");
-    println!("API: http://localhost:8000");
+    // Get container metrics
+    let metrics = client.get_container_metrics("my-nginx").await?;
+    println!("Container uptime: {}", metrics.uptime.as_secs());
+    println!("Memory usage: {}", metrics.memory_usage_display());
+    println!("CPU usage: {:.1}%", metrics.cpu_percentage);
 
     Ok(())
 }
 ```
 
-### Loading from Configuration File
+## Core Concepts
+
+### Resource Status
+
+Anchor tracks the lifecycle of Docker resources through the `ResourceStatus` enum:
+
+- **Missing** - Image needs to be downloaded
+- **Available** - Image is downloaded but container doesn't exist
+- **Built** - Container exists but isn't running
+- **Running** - Container is actively running
+
+```rust
+let status = client.get_resource_status("nginx:latest", "my-nginx").await?;
+match status {
+    ResourceStatus::Missing => println!("Need to pull image"),
+    ResourceStatus::Available => println!("Ready to build container"),
+    ResourceStatus::Built => println!("Ready to start container"),
+    ResourceStatus::Running => println!("Container is running"),
+}
+```
+
+### Mount Types
+
+Anchor supports three types of mounts:
+
+```rust
+// Bind mount - mount host directory/file into container
+let bind_mount = MountType::bind("/host/data", "/app/data");
+let readonly_bind = MountType::bind_ro("/host/config", "/app/config");
+
+// Named volume - use Docker-managed volume
+let volume_mount = MountType::volume("my-volume", "/app/storage");
+let readonly_volume = MountType::volume_ro("config-vol", "/app/config");
+
+// Anonymous volume - create temporary volume
+let anon_volume = MountType::anonymous_volume("/tmp/cache");
+let readonly_anon = MountType::anonymous_volume_ro("/app/readonly");
+```
+
+### Container Metrics
+
+Get detailed runtime information about your containers:
+
+```rust
+let metrics = client.get_container_metrics("my-container").await?;
+
+println!("Uptime: {}", format_duration(metrics.uptime));
+println!("Memory: {}", metrics.memory_usage_display());
+println!("CPU: {:.1}%", metrics.cpu_percentage);
+println!("Network: {}", metrics.network_usage_display());
+println!("Disk I/O: {}", metrics.disk_io_display());
+println!("Health: {}", metrics.health_status.unwrap_or_default());
+```
+
+## AWS ECR Integration
+
+When the `aws_ecr` feature is enabled, you can authenticate with Amazon ECR:
 
 ```rust
 use anchor::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load from JSON file
-    let manifest = Manifest::load("./config/production.json")?;
+async fn main() -> AnchorResult<()> {
+    // Get ECR credentials (requires AWS credentials in environment)
+    let credentials = get_ecr_credentials().await
+        .map_err(|e| AnchorError::ECRCredentialsError(e.to_string()))?;
 
-    println!("Loaded {} containers", manifest.containers().len());
+    let client = Client::new(credentials).await?;
 
-    // Display configuration
-    for (name, container) in manifest.containers() {
-        println!("📦 {}: {}", name, container.uri);
-        println!("   Command: {}", container.command);
-        println!("   Ports: {:?}", container.port_mappings);
-    }
+    // Pull from ECR
+    client.pull_image("123456789012.dkr.ecr.us-west-2.amazonaws.com/my-app:latest").await?;
 
     Ok(())
 }
 ```
 
-## Requirements
+## Advanced Usage
 
-- Docker installed and running
-- Rust 2024 or later
-- Network access for image downloads
-- Appropriate permissions for Docker operations
+### Custom Error Handling
+
+```rust
+use anchor::prelude::*;
+
+async fn handle_container(client: &Client) -> AnchorResult<()> {
+    match client.start_container("my-app").await {
+        Ok(()) => println!("Container started successfully"),
+        Err(AnchorError::ContainerError { container, message }) => {
+            eprintln!("Failed to start {}: {}", container, message);
+        }
+        Err(AnchorError::ConnectionError(msg)) => {
+            eprintln!("Docker connection failed: {}", msg);
+            start_docker_daemon()?;
+        }
+        Err(e) => eprintln!("Unexpected error: {}", e),
+    }
+    Ok(())
+}
+```
+
+### Health Monitoring
+
+```rust
+use std::time::Duration;
+use tokio::time::sleep;
+
+async fn monitor_container_health(client: &Client, name: &str) -> AnchorResult<()> {
+    loop {
+        let status = client.get_container_status(name).await?;
+
+        if status.is_running() {
+            let metrics = client.get_container_metrics(name).await?;
+
+            if let Some(health) = metrics.health_status {
+                match health {
+                    HealthStatus::Healthy => println!("✅ Container is healthy"),
+                    HealthStatus::Unhealthy => println!("❌ Container is unhealthy"),
+                    HealthStatus::Starting => println!("🔄 Health check starting"),
+                    HealthStatus::None => println!("ℹ️ No health check configured"),
+                }
+            }
+
+            // Alert on high resource usage
+            if metrics.cpu_percentage > 80.0 {
+                println!("⚠️ High CPU usage: {:.1}%", metrics.cpu_percentage);
+            }
+
+            if let Some(mem_pct) = metrics.memory_percentage {
+                if mem_pct > 80.0 {
+                    println!("⚠️ High memory usage: {:.1}%", mem_pct);
+                }
+            }
+        }
+
+        sleep(Duration::from_secs(30)).await;
+    }
+}
+```
 
 ## Platform Support
 
-- ✅ Linux
-- ✅ macOS
-- ✅ Windows (with Docker Desktop)
+Anchor automatically detects and adapts to your platform:
 
-## Contributing
+- **Linux** - Uses `systemctl` or `service` commands to start Docker daemon
+- **macOS** - Integrates with Docker Desktop
+- **Windows** - Supports Docker Desktop on Windows
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+The library automatically starts the Docker daemon when needed:
+
+```rust
+if !client.is_docker_running().await {
+    start_docker_daemon()?;
+}
+```
+
+## Error Types
+
+Anchor provides comprehensive error handling:
+
+- `DockerNotInstalled` - Docker is not installed on the system
+- `ConnectionError` - Cannot connect to Docker daemon
+- `ECRCredentialsError` - AWS ECR authentication failed
+- `ImageError` - Image-related operation failed
+- `ContainerError` - Container-related operation failed
+- `IoStreamError` - I/O operation failed
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Dependencies
+
+- `bollard` - Docker API client
+- `tokio` - Async runtime
+- `chrono` - Date and time handling
+- `aws-sdk-ecr` - AWS ECR integration (optional)
+- `base64` - Base64 encoding/decoding
+
+## Minimum Supported Rust Version (MSRV)
+
+Rust 1.70 or higher is required.

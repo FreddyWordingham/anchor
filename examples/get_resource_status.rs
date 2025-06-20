@@ -1,4 +1,4 @@
-use anchor::prelude::{Client, ResourceStatus, get_ecr_credentials};
+use anchor::prelude::{Client, get_ecr_credentials};
 use std::error::Error;
 
 const IMAGE_REF: &str = "939027885851.dkr.ecr.eu-west-2.amazonaws.com/uncertainty-engine-add-node:latest";
@@ -10,15 +10,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let client = Client::new(credentials).await?;
 
     let status = client.get_resource_status(IMAGE_REF, CONTAINER_NAME).await?;
-    match status {
-        ResourceStatus::Running => {
-            client.stop_container(CONTAINER_NAME).await?;
-            println!("Container {CONTAINER_NAME} stopped successfully.");
-        }
-        _ => {
-            println!("Container is not running.");
-        }
-    }
+    println!("Resource Status: {status}");
 
     Ok(())
 }

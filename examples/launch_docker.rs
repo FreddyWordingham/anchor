@@ -3,8 +3,8 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    println!("Starting Docker daemon...");
-    start_docker_daemon().await?;
-    println!("Docker process started successfully.");
+    start_docker_daemon()?;
+    println!("Docker daemon launched successfully.");
+
     Ok(())
 }

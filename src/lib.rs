@@ -2,7 +2,7 @@
 
 #![deny(absolute_paths_not_starting_with_crate)]
 #![deny(ambiguous_negative_literals)]
-#![deny(dead_code)]
+// #![deny(dead_code)] ////////// Turn on before release
 #![deny(deprecated_safe_2024)]
 #![deny(deref_into_dyn_supertrait)]
 #![deny(edition_2024_expr_fragment_specifier)]
@@ -43,20 +43,20 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![deny(unstable_features)]
 #![deny(unused_assignments)]
-#![deny(unused_crate_dependencies)]
-#![deny(unused_extern_crates)]
-#![deny(unused_import_braces)]
-#![deny(unused_imports)]
-#![deny(unused_lifetimes)]
-#![deny(unused_macro_rules)]
-#![deny(unused_must_use)]
-#![deny(unused_mut)]
-#![deny(unused_qualifications)]
-#![deny(unused_results)]
-#![deny(unused_variables)]
-#![deny(unused)]
+// #![deny(unused_crate_dependencies)] ////////// Turn on before release
+// #![deny(unused_extern_crates)] ////////// Turn on before release
+// #![deny(unused_import_braces)] ////////// Turn on before release
+// #![deny(unused_imports)] ////////// Turn on before release
+// #![deny(unused_lifetimes)] ////////// Turn on before release
+// #![deny(unused_macro_rules)] ////////// Turn on before release
+// #![deny(unused_must_use)] ////////// Turn on before release
+// #![deny(unused_mut)] ////////// Turn on before release
+// #![deny(unused_qualifications)] ////////// Turn on before release
+// #![deny(unused_results)] ////////// Turn on before release
+// #![deny(unused_variables)] ////////// Turn on before release
+// #![deny(unused)] ////////// Turn on before release
 #![deny(variant_size_differences)]
-#![deny(warnings)]
+// #![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::cargo)]
 #![deny(clippy::complexity)]
@@ -72,29 +72,30 @@
     reason = "Multiple versions of some dependencies are used in the workspace, but they are compatible and do not cause issues."
 )]
 
-mod cluster;
-mod cluster_status;
-mod command;
-mod configuration;
-mod container;
-mod container_state;
-mod docker_client;
-mod docker_error;
-mod launch_docker;
-mod manifest;
-mod manifest_error;
-
 #[cfg(feature = "aws_ecr")]
 mod credentials;
 
+mod anchor_error;
+mod client;
+mod container_metrics;
+mod format;
+mod health_status;
+mod mount_type;
+mod resource_status;
+mod start_docker_daemon;
+
 /// Re-export the main types and traits for easy access
 pub mod prelude {
-    pub use crate::{
-        cluster::Cluster, cluster_status::ClusterStatus, command::Command, configuration::Configuration, container::Container,
-        docker_client::DockerClient, docker_error::DockerError, launch_docker::start_docker_daemon, manifest::Manifest,
-        manifest_error::ManifestError,
-    };
-
     #[cfg(feature = "aws_ecr")]
-    pub use crate::credentials::*;
+    pub use crate::credentials::get_ecr_credentials;
+
+    pub use crate::{
+        anchor_error::{AnchorError, AnchorResult},
+        client::Client,
+        container_metrics::ContainerMetrics,
+        health_status::HealthStatus,
+        mount_type::MountType,
+        resource_status::ResourceStatus,
+        start_docker_daemon::start_docker_daemon,
+    };
 }

@@ -1,28 +1,28 @@
 use std::process::Command;
 
-use crate::{docker_client::Result, prelude::DockerError};
+use crate::anchor_error::{AnchorError, AnchorResult};
 
 /// Attempts to start the Docker daemon process based on the operating system.
 ///
 /// # Errors
-/// Returns `DockerError::ConnectionError` if the start command fails.
-pub async fn start_docker_daemon() -> Result<()> {
+/// Returns `AnchorError::ConnectionError` if the start command fails.
+pub fn start_docker_daemon() -> AnchorResult<()> {
     let result = if cfg!(target_os = "macos") {
         // On macOS, try to start Docker Desktop
-        start_docker_macos().await
+        start_docker_macos()
     } else if cfg!(target_os = "windows") {
         // On Windows, try to start Docker Desktop
-        start_docker_windows().await
+        start_docker_windows()
     } else {
         // On Linux, try to start Docker service
-        start_docker_linux().await
+        start_docker_linux()
     };
 
     result
 }
 
 /// Starts Docker Desktop on macOS.
-async fn start_docker_macos() -> Result<()> {
+fn start_docker_macos() -> AnchorResult<()> {
     // Try different possible locations for Docker Desktop
     let docker_paths = ["/Applications/Docker.app", "/System/Applications/Docker.app"];
 
@@ -45,14 +45,14 @@ async fn start_docker_macos() -> Result<()> {
 
     match output {
         Ok(output) if output.status.success() => Ok(()),
-        _ => Err(DockerError::ConnectionError(
+        _ => Err(AnchorError::ConnectionError(
             "Failed to start Docker on macOS. Please start Docker Desktop manually.".to_string(),
         )),
     }
 }
 
 /// Starts Docker Desktop on Windows.
-async fn start_docker_windows() -> Result<()> {
+fn start_docker_windows() -> AnchorResult<()> {
     // Try to start Docker Desktop
     let docker_paths = [
         r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
@@ -78,14 +78,14 @@ async fn start_docker_windows() -> Result<()> {
 
     match output {
         Ok(output) if output.status.success() => Ok(()),
-        _ => Err(DockerError::ConnectionError(
+        _ => Err(AnchorError::ConnectionError(
             "Failed to start Docker on Windows. Please start Docker Desktop manually.".to_string(),
         )),
     }
 }
 
 /// Starts Docker service on Linux.
-async fn start_docker_linux() -> Result<()> {
+fn start_docker_linux() -> AnchorResult<()> {
     // Try systemctl first (most common on modern Linux)
     let systemctl_output = Command::new("sudo").args(["systemctl", "start", "docker"]).output();
 
@@ -109,7 +109,7 @@ async fn start_docker_linux() -> Result<()> {
 
     match dockerd_output {
             Ok(output) if output.status.success() => Ok(()),
-            _ => Err(DockerError::ConnectionError(
+            _ => Err(AnchorError::ConnectionError(
                 "Failed to start Docker on Linux. Please start Docker service manually with 'sudo systemctl start docker' or 'sudo service docker start'.".to_string()
             )),
         }

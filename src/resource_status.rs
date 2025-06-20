@@ -1,0 +1,50 @@
+use std::fmt::{Display, Formatter, Result};
+
+/// Represents the status a container can be in during its lifecycle.
+#[derive(Debug, Clone, Copy)]
+pub enum ResourceStatus {
+    /// Image not available, needs to be downloaded
+    Missing,
+    /// Image locally available
+    Available,
+    /// Container build completed for the specified container
+    Built,
+    /// Container startup completed for the specified container
+    Running,
+}
+
+impl ResourceStatus {
+    /// Returns true if the resource is in Missing state
+    pub fn is_missing(&self) -> bool {
+        matches!(self, ResourceStatus::Missing)
+    }
+
+    /// Returns true if the resource is at least available (Available, Built, or Running)
+    pub fn is_available(&self) -> bool {
+        matches!(
+            self,
+            ResourceStatus::Available | ResourceStatus::Built | ResourceStatus::Running
+        )
+    }
+
+    /// Returns true if the resource is at least built (Built or Running)
+    pub fn is_built(&self) -> bool {
+        matches!(self, ResourceStatus::Built | ResourceStatus::Running)
+    }
+
+    /// Returns true if the resource is in Running state
+    pub fn is_running(&self) -> bool {
+        matches!(self, ResourceStatus::Running)
+    }
+}
+
+impl Display for ResourceStatus {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
+        match self {
+            Self::Missing => write!(fmt, "Missing"),
+            Self::Available => write!(fmt, "Available"),
+            Self::Built => write!(fmt, "Built"),
+            Self::Running => write!(fmt, "Running"),
+        }
+    }
+}

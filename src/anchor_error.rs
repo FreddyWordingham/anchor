@@ -1,33 +1,36 @@
 use std::fmt::{Display, Formatter};
 
+/// Result type for Anchor operations, encapsulating `AnchorError`.
+pub type AnchorResult<T> = Result<T, AnchorError>;
+
 /// Errors that can occur when interacting with the Docker daemon.
 #[derive(Debug)]
-pub enum DockerError {
-    /// Docker is not installed or not found
-    NotInstalled,
-    /// Error connecting to the Docker daemon or server
+pub enum AnchorError {
+    /// Docker is not installed on the system.
+    DockerNotInstalled,
+    /// Error connecting to the Docker daemon.
     ConnectionError(String),
-    /// Error retrieving ECR credentials
+    /// Error retrieving ECR credentials.
     ECRCredentialsError(String),
-    /// Specific error related to a Docker image
+    /// Error related to a specific Docker image.
     ImageError {
-        /// The Docker image that caused the error
+        /// The reference of the Docker image associated with the error.
         image: String,
-        /// A descriptive error message
+        /// A message describing the error.
         message: String,
     },
-    /// Specific error related to a Docker container
+    /// Error related to a specific Docker container.
     ContainerError {
-        /// The Docker container that caused the error
+        /// The name of the Docker container associated with the error.
         container: String,
-        /// A descriptive error message
+        /// A message describing the error.
         message: String,
     },
-    /// Error reading from or writing to a Docker stream
+    /// IO stream error.
     IoStreamError(String),
 }
 
-impl DockerError {
+impl AnchorError {
     /// Create an `ImageError` with context
     pub fn image_error<S: AsRef<str>, M: AsRef<str>>(image: S, message: M) -> Self {
         Self::ImageError {
@@ -45,13 +48,13 @@ impl DockerError {
     }
 }
 
-impl From<std::io::Error> for DockerError {
+impl From<std::io::Error> for AnchorError {
     fn from(err: std::io::Error) -> Self {
         Self::IoStreamError(err.to_string())
     }
 }
 
-impl From<bollard::errors::Error> for DockerError {
+impl From<bollard::errors::Error> for AnchorError {
     fn from(err: bollard::errors::Error) -> Self {
         match err {
             bollard::errors::Error::DockerResponseServerError { message, .. } => Self::ConnectionError(message),
@@ -61,10 +64,10 @@ impl From<bollard::errors::Error> for DockerError {
     }
 }
 
-impl Display for DockerError {
+impl Display for AnchorError {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotInstalled => write!(fmt, "Docker is not installed"),
+            Self::DockerNotInstalled => write!(fmt, "Docker is not installed"),
             Self::ConnectionError(message) => write!(fmt, "Docker connection error: {message}"),
             Self::ECRCredentialsError(message) => write!(fmt, "Docker ECR credentials error: {message}"),
             Self::ImageError { image, message } => {
@@ -78,4 +81,4 @@ impl Display for DockerError {
     }
 }
 
-impl std::error::Error for DockerError {}
+impl std::error::Error for AnchorError {}
