@@ -80,6 +80,7 @@ mod container;
 mod container_state;
 mod docker_client;
 mod docker_error;
+mod launch_docker;
 mod manifest;
 mod manifest_error;
 
@@ -90,7 +91,8 @@ mod credentials;
 pub mod prelude {
     pub use crate::{
         cluster::Cluster, cluster_status::ClusterStatus, command::Command, configuration::Configuration, container::Container,
-        docker_client::DockerClient, docker_error::DockerError, manifest::Manifest, manifest_error::ManifestError,
+        docker_client::DockerClient, docker_error::DockerError, launch_docker::start_docker_daemon, manifest::Manifest,
+        manifest_error::ManifestError,
     };
 
     #[cfg(feature = "aws_ecr")]
