@@ -437,8 +437,8 @@ impl Client {
     /// # Arguments
     /// * `image_reference` - Docker image to create container from
     /// * `container_name` - Name to assign to the new container
-    /// * `port_mappings` - Array of (`container_port`, `host_port`) tuples
-    /// * `env_vars` - Array of (`key`, `value`) tuples for environment variables
+    /// * `port_mappings` - HashMap mapping container ports to host ports
+    /// * `env_vars` - HashMap of environment variable key-value pairs
     /// * `mounts` - Array of mount configurations (volumes, bind mounts, etc.)
     ///
     /// # Returns
@@ -450,8 +450,8 @@ impl Client {
         &self,
         image_reference: S,
         container_name: T,
-        port_mappings: &[(u16, u16)],
-        env_vars: &[(&str, &str)],
+        port_mappings: &HashMap<u16, u16>,
+        env_vars: &HashMap<String, String>,
         mounts: &[MountType],
     ) -> AnchorResult<String> {
         // Check if image exists first
