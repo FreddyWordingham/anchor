@@ -125,7 +125,7 @@ impl Client {
         let is_available = self.is_image_downloaded(image_reference).await?;
 
         if is_available {
-            Ok(ResourceStatus::Available)
+            Ok(ResourceStatus::Downloaded)
         } else {
             Ok(ResourceStatus::Missing)
         }
@@ -437,8 +437,8 @@ impl Client {
     /// # Arguments
     /// * `image_reference` - Docker image to create container from
     /// * `container_name` - Name to assign to the new container
-    /// * `port_mappings` - HashMap mapping container ports to host ports
-    /// * `env_vars` - HashMap of environment variable key-value pairs
+    /// * `port_mappings` - `HashMap` mapping container ports to host ports
+    /// * `env_vars` - `HashMap` of environment variable key-value pairs
     /// * `mounts` - Array of mount configurations (volumes, bind mounts, etc.)
     ///
     /// # Returns

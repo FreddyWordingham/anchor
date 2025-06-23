@@ -28,7 +28,7 @@ dependencies = [
 
 [[package]]
 name = "anchor"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aws-config",
  "aws-sdk-ecr",
@@ -36,6 +36,7 @@ dependencies = [
  "bollard",
  "chrono",
  "futures-util",
+ "serde",
  "tokio",
 ]
 

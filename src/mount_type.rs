@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter, Result};
 
 /// Represents different types of mounts that can be attached to a container
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MountType {
     /// Bind mount: mounts a file or directory from the host
     Bind {

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter, Result},
     time::Duration,
@@ -9,7 +10,7 @@ use crate::{
 };
 
 /// Runtime metrics for a running container
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ContainerMetrics {
     /// Container uptime since it was started
     pub uptime: Duration,
